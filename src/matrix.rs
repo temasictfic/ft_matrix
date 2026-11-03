@@ -3,7 +3,7 @@ use std::fmt::{self, Display, Formatter};
 use crate::errors::MatrixError;
 use crate::functions::Lerp;
 use crate::scalar::Scalar;
-use crate::utils::zero_tolerance_sq;
+use crate::utils::{max_f32, zero_tolerance_sq};
 use crate::vector::Vector;
 
 /// A `rows` x `cols` matrix.
@@ -80,8 +80,9 @@ impl<K: Scalar> Matrix<K> {
         let max_modulus_sq = self
             .data
             .iter()
-            .fold(0.0f32, |best, value| best.max(value.modulus_sq()));
-        zero_tolerance_sq(self.rows.max(self.cols), max_modulus_sq)
+            .fold(0.0f32, |best, value| max_f32(best, value.modulus_sq()));
+        let dim = if self.rows < self.cols { self.cols } else { self.rows };
+        zero_tolerance_sq(dim, max_modulus_sq)
     }
 
     /// Flushes rounding noise (relative to this matrix's own scale) to exact zeros.

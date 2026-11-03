@@ -83,11 +83,13 @@ src/
   vector.rs     Vector<K>: ex00, ex03, ex04, reshape to matrix
   matrix.rs     Matrix<K>: ex00, ex07–ex13, Gaussian elimination helpers
   functions.rs  linear_combination, lerp (+ Lerp trait), angle_cos, cross_product, projection
-  utils.rs      hand-written abs, relative zero tolerance
+  utils.rs      hand-written abs and max, relative zero tolerance
   errors.rs     MatrixError
   bin/exNN.rs   one runnable demo per exercise
 tests/
   subject.rs    all subject examples + tolerance, projection and complex regression tests
+  ex14_display.rs  runs the ex14 binary and checks the proj file it writes
+display.sh      runs ex14 and opens the display program (with the Linux black-window fix)
 docs/
   math.html     illustrated explanation of all the math
 ```
@@ -127,19 +129,36 @@ entry to exactly `0`. Afterwards, any remaining noise below the tolerance is flu
 mapped to NDC z ∈ [0, 1] (near → 0, far → 1). `fov` is in radians.
 
 ```sh
-cargo run --bin ex14                      # fov 70°, ratio 16/9, near 0.1, far 100
-cargo run --bin ex14 -- 90 1.333 0.5 50   # fov_degrees ratio near far
+./display.sh                     # fov 70°, ratio 1, near 0.1, far 100, then open the display
+./display.sh 90 1 0.5 50         # fov_degrees ratio near far
+cargo run --bin ex14 -- 90 1 0.5 50   # only write ./proj
 ```
 
-The binary writes `./proj` in the format the display program expects: column-major, one column
+`ex14` writes `./proj` in the format the display program expects: column-major, one column
 per line, comma-separated. It writes the file directly because redirecting with `>` in
-PowerShell would save it as UTF-16. Then run the display program on Linux or WSL:
+PowerShell would save it as UTF-16. The default ratio is 1 because the display window is a fixed
+1000×1000 (ratio = w / h). Any other ratio stretches the logo sideways.
 
-```sh
-tar xzf display_linux.tar.gz && cp proj matrix_display/ && cd matrix_display && ./display
-```
+`display.sh` extracts `display_linux.tar.gz` if needed, runs `ex14` inside `matrix_display/`,
+and starts `./display`. Run the display through the script, not on its own. The display steers
+the camera with the mouse: on each cursor event it adds `(x − 500, y − 500) × 0.01` to yaw and
+pitch, then warps the cursor back to (500, 500). On a desktop Linux session this can leave the
+window **completely black**, because the camera ends up facing the floor:
+
+- **HiDPI scaling** (for example GNOME at 125%): the warp target is in logical pixels, but
+  events are reported in physical pixels. Every warp then reads as a 125 px jump, and the
+  camera spins forever. The script sets `WINIT_X11_SCALE_FACTOR=1`.
+- **The first cursor event** reports wherever the mouse happens to be, which is one large
+  jump. The script opens the window once to find where it is placed, then puts the cursor at
+  its centre before starting the real run. This needs `python3` and `xwininfo` (`x11-utils`).
+
+The matrix itself has nothing to do with the black window. If the view is still off, move the
+mouse to look around: the camera starts at (0, 0, 10) facing the logo at the origin.
 
 To check the matrix, change `near` and `far` and watch which parts of the model get clipped.
+For example, `./display.sh 70 1 9.95 10.05` keeps only the depths between 9.95 and 10.05. The
+logo is 0.2 thick and centred 10 units away, so its front face (9.9) and back face (10.1)
+disappear and only thin slices of its side walls remain.
 
 ## Testing
 
@@ -153,6 +172,7 @@ The tests in `tests/subject.rs` cover:
 - every example in the subject, compared with a tolerance;
 - non-symmetric matrices, which catch row/column mix-ups;
 - singular matrices at scales from `1e-6` to `1e6`, and tiny or huge invertible matrices;
-- the projection mapping near → 0 and far → 1;
+- the projection: near → 0 and far → 1, frustum edges → NDC ±1, `w = −z`, how each parameter
+  acts, and (in `tests/ex14_display.rs`) the column-major `proj` file that `ex14` writes;
 - complex vectors and matrices: `A⁻¹A = I`, singular detection, and complex pivots using the
   same tolerance as real ones.

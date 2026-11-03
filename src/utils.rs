@@ -3,6 +3,12 @@ pub fn abs_f32(value: f32) -> f32 {
     if value < 0.0 { -value } else { value }
 }
 
+/// `max(a, b)`, written by hand: ex10–ex13 allow no math function besides
+/// fused multiply-add, and they rely on the zero tolerance below.
+pub fn max_f32(a: f32, b: f32) -> f32 {
+    if a < b { b } else { a }
+}
+
 /// Squared threshold below which a value counts as zero during Gaussian elimination.
 ///
 /// This is deliberately *not* `f32::EPSILON` used as an absolute bound.

@@ -419,6 +419,93 @@ fn ex14_projection_maps_near_to_0_and_far_to_1() {
     assert_close(p.get(1, 1), 1.0);
 }
 
+/// Projects a camera-space point and returns NDC (x, y, z) plus the clip w.
+fn project(p: &Matrix<f32>, point: [f32; 3]) -> ([f32; 3], f32) {
+    let clip = p.mul_vec(&Vector::from([point[0], point[1], point[2], 1.]));
+    let w = clip[3];
+    ([clip[0] / w, clip[1] / w, clip[2] / w], w)
+}
+
+#[test]
+fn ex14_projection_coefficients() {
+    let (fov, ratio, near, far) = (70f32.to_radians(), 16. / 9., 0.1, 100.);
+    let p = projection(fov, ratio, near, far);
+    let focal = 1. / (fov / 2.).tan();
+    assert_mat(
+        &p,
+        [
+            [focal / ratio, 0., 0., 0.],
+            [0., focal, 0., 0.],
+            [0., 0., far / (near - far), near * far / (near - far)],
+            [0., 0., -1., 0.],
+        ],
+    );
+}
+
+/// The four edges of the frustum land exactly on the NDC borders x, y = ±1.
+#[test]
+fn ex14_frustum_edges_map_to_ndc_borders() {
+    let (fov, ratio, near, far) = (60f32.to_radians(), 1.5, 1., 20.);
+    let p = projection(fov, ratio, near, far);
+    let half_h = (fov / 2.).tan();
+    for depth in [near, 5., far] {
+        let (ndc, _) = project(&p, [depth * half_h * ratio, depth * half_h, -depth]);
+        assert_close(ndc[0], 1.);
+        assert_close(ndc[1], 1.);
+        let (ndc, _) = project(&p, [-depth * half_h * ratio, -depth * half_h, -depth]);
+        assert_close(ndc[0], -1.);
+        assert_close(ndc[1], -1.);
+    }
+}
+
+/// The display's NDC: z ∈ [0, 1] inside the frustum, increasing with distance,
+/// and outside [0, 1] for anything closer than near or farther than far.
+#[test]
+fn ex14_depth_range_is_zero_to_one() {
+    let (near, far) = (0.1, 100.);
+    let p = projection(70f32.to_radians(), 1., near, far);
+    let depth = |d: f32| project(&p, [0., 0., -d]).0[2];
+
+    let mut previous = depth(near);
+    assert_close(previous, 0.);
+    for d in [0.2, 1., 10., 50., 99.] {
+        let z = depth(d);
+        assert!(z > previous && (0.0..=1.0).contains(&z), "z({d}) = {z}");
+        previous = z;
+    }
+    assert_close(depth(far), 1.);
+    assert!(depth(near / 2.) < 0., "closer than near must be clipped");
+    assert!(depth(far * 2.) > 1., "farther than far must be clipped");
+}
+
+/// w = -z: the perspective divide shrinks distant points, and anything behind
+/// the camera gets a negative w (clipped by the GPU).
+#[test]
+fn ex14_perspective_divide() {
+    let p = projection(90f32.to_radians(), 1., 0.5, 50.);
+    let (near_ndc, w) = project(&p, [1., 1., -2.]);
+    assert_close(w, 2.);
+    let (far_ndc, _) = project(&p, [1., 1., -8.]);
+    assert_close(near_ndc[0], 4. * far_ndc[0]);
+    assert!(project(&p, [0., 0., 3.]).1 < 0.);
+}
+
+/// ratio only squeezes x; fov zooms both axes; near and far only touch depth.
+#[test]
+fn ex14_parameters_are_independent() {
+    let base = projection(1., 1., 0.1, 100.);
+    let wide = projection(1., 2., 0.1, 100.);
+    assert_close(wide.get(0, 0), base.get(0, 0) / 2.);
+    assert_close(wide.get(1, 1), base.get(1, 1));
+
+    let zoomed = projection(0.5, 1., 0.1, 100.);
+    assert!(zoomed.get(0, 0) > base.get(0, 0) && zoomed.get(1, 1) > base.get(1, 1));
+
+    let other_planes = projection(1., 1., 2., 10.);
+    assert_close(other_planes.get(0, 0), base.get(0, 0));
+    assert_close(other_planes.get(1, 1), base.get(1, 1));
+}
+
 // ---------------------------------------------------------------- reshape
 
 #[test]
