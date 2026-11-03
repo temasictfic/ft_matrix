@@ -1,53 +1,120 @@
-use std::fmt::{Display, Formatter};
-use std::ops::{Add, Index, IndexMut, Mul, Sub};
+use std::fmt::{self, Display, Formatter};
+use std::ops::{Index, IndexMut};
 
-use crate::complex::Complex;
-use crate::utils::abs_f32;
+use crate::functions::Lerp;
+use crate::matrix::Matrix;
+use crate::scalar::Scalar;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Vector<K> {
     data: Vec<K>,
 }
 
-impl<K> Vector<K> {
+impl<K: Scalar> Vector<K> {
     pub fn new(data: Vec<K>) -> Self {
         Self { data }
+    }
+
+    pub fn zeros(size: usize) -> Self {
+        Self::new(vec![K::zero(); size])
     }
 
     pub fn size(&self) -> usize {
         self.data.len()
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.data.is_empty()
+    }
+
     pub fn as_slice(&self) -> &[K] {
         &self.data
     }
-}
 
-impl<const N: usize> From<[f32; N]> for Vector<f32> {
-    fn from(value: [f32; N]) -> Self {
-        Self {
-            data: value.to_vec(),
+    /// Reshapes into a `rows` x `cols` matrix, filling it column by column.
+    pub fn to_matrix(&self, rows: usize, cols: usize) -> Matrix<K> {
+        Matrix::from_column_major(self.data.clone(), rows, cols)
+    }
+
+    // ex00
+    pub fn add(&mut self, v: &Vector<K>) {
+        assert_eq!(self.size(), v.size(), "vector dimensions must match");
+        for (lhs, &rhs) in self.data.iter_mut().zip(&v.data) {
+            *lhs += rhs;
         }
     }
-}
 
-impl From<Vec<f32>> for Vector<f32> {
-    fn from(value: Vec<f32>) -> Self {
-        Self { data: value }
-    }
-}
-
-impl<const N: usize> From<[Complex; N]> for Vector<Complex> {
-    fn from(value: [Complex; N]) -> Self {
-        Self {
-            data: value.to_vec(),
+    pub fn sub(&mut self, v: &Vector<K>) {
+        assert_eq!(self.size(), v.size(), "vector dimensions must match");
+        for (lhs, &rhs) in self.data.iter_mut().zip(&v.data) {
+            *lhs -= rhs;
         }
     }
+
+    pub fn scl(&mut self, a: K) {
+        for value in &mut self.data {
+            *value *= a;
+        }
+    }
+
+    // ex03
+    /// Bilinear dot product `Σ uᵢvᵢ` (the subject's prototype).
+    pub fn dot(&self, v: &Vector<K>) -> K {
+        assert_eq!(self.size(), v.size(), "vector dimensions must match");
+        self.data
+            .iter()
+            .zip(&v.data)
+            .fold(K::zero(), |acc, (&lhs, &rhs)| lhs.mul_add(rhs, acc))
+    }
+
+    /// Inner product `Σ conj(uᵢ)vᵢ`. Same as `dot` over the reals; over the
+    /// complex numbers it is the sesquilinear product norms and angles come from.
+    pub fn hermitian_dot(&self, v: &Vector<K>) -> K {
+        assert_eq!(self.size(), v.size(), "vector dimensions must match");
+        self.data
+            .iter()
+            .zip(&v.data)
+            .fold(K::zero(), |acc, (&lhs, &rhs)| lhs.conj().mul_add(rhs, acc))
+    }
+
+    // ex04
+    pub fn norm_1(&self) -> f32 {
+        self.data.iter().map(|value| value.modulus()).sum()
+    }
+
+    pub fn norm(&self) -> f32 {
+        self.hermitian_dot(self).real().powf(0.5)
+    }
+
+    pub fn norm_inf(&self) -> f32 {
+        self.data
+            .iter()
+            .fold(0.0f32, |best, value| best.max(value.modulus()))
+    }
 }
 
-impl From<Vec<Complex>> for Vector<Complex> {
-    fn from(value: Vec<Complex>) -> Self {
-        Self { data: value }
+impl<K: Scalar> Lerp for Vector<K> {
+    fn lerp_to(self, other: Self, t: f32) -> Self {
+        assert_eq!(self.size(), other.size(), "vector dimensions must match");
+        let data = self
+            .data
+            .into_iter()
+            .zip(other.data)
+            .map(|(u, v)| u.lerp_to(v, t))
+            .collect();
+        Self { data }
+    }
+}
+
+impl<K: Scalar, const N: usize> From<[K; N]> for Vector<K> {
+    fn from(value: [K; N]) -> Self {
+        Self::new(value.to_vec())
+    }
+}
+
+impl<K: Scalar> From<Vec<K>> for Vector<K> {
+    fn from(value: Vec<K>) -> Self {
+        Self::new(value)
     }
 }
 
@@ -65,232 +132,16 @@ impl<K> IndexMut<usize> for Vector<K> {
     }
 }
 
-impl Display for Vector<f32> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+impl<K: Scalar> Display for Vector<K> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         for (idx, value) in self.data.iter().enumerate() {
-            write!(f, "[{}]", value)?;
-            if idx + 1 != self.data.len() {
+            if idx != 0 {
                 writeln!(f)?;
             }
+            write!(f, "[")?;
+            value.fmt_scalar(f)?;
+            write!(f, "]")?;
         }
         Ok(())
-    }
-}
-
-impl Display for Vector<Complex> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        for (idx, value) in self.data.iter().enumerate() {
-            write!(f, "[{}]", value)?;
-            if idx + 1 != self.data.len() {
-                writeln!(f)?;
-            }
-        }
-        Ok(())
-    }
-}
-
-impl Vector<f32> {
-    pub fn add(&mut self, v: &Vector<f32>) {
-        assert_eq!(self.size(), v.size(), "vector dimensions must match");
-        for (lhs, rhs) in self.data.iter_mut().zip(v.data.iter()) {
-            *lhs += *rhs;
-        }
-    }
-
-    pub fn sub(&mut self, v: &Vector<f32>) {
-        assert_eq!(self.size(), v.size(), "vector dimensions must match");
-        for (lhs, rhs) in self.data.iter_mut().zip(v.data.iter()) {
-            *lhs -= *rhs;
-        }
-    }
-
-    pub fn scl(&mut self, a: f32) {
-        for value in &mut self.data {
-            *value *= a;
-        }
-    }
-
-    pub fn dot(&self, v: &Vector<f32>) -> f32 {
-        assert_eq!(self.size(), v.size(), "vector dimensions must match");
-        let mut acc = 0.0;
-        for (&lhs, &rhs) in self.data.iter().zip(v.data.iter()) {
-            acc = lhs.mul_add(rhs, acc);
-        }
-        acc
-    }
-
-    pub fn norm_1(&self) -> f32 {
-        let mut sum = 0.0;
-        for &value in &self.data {
-            sum += abs_f32(value);
-        }
-        sum
-    }
-
-    pub fn norm(&self) -> f32 {
-        let mut squared = 0.0;
-        for &value in &self.data {
-            squared = value.mul_add(value, squared);
-        }
-        squared.powf(0.5)
-    }
-
-    pub fn norm_inf(&self) -> f32 {
-        let mut best: f32 = 0.0;
-        for &value in &self.data {
-            best = best.max(abs_f32(value));
-        }
-        best
-    }
-}
-
-impl Vector<Complex> {
-    pub fn add(&mut self, v: &Vector<Complex>) {
-        assert_eq!(self.size(), v.size(), "vector dimensions must match");
-        for (lhs, rhs) in self.data.iter_mut().zip(v.data.iter()) {
-            *lhs += *rhs;
-        }
-    }
-
-    pub fn sub(&mut self, v: &Vector<Complex>) {
-        assert_eq!(self.size(), v.size(), "vector dimensions must match");
-        for (lhs, rhs) in self.data.iter_mut().zip(v.data.iter()) {
-            *lhs -= *rhs;
-        }
-    }
-
-    pub fn scl(&mut self, a: Complex) {
-        for value in &mut self.data {
-            *value *= a;
-        }
-    }
-
-    pub fn dot(&self, v: &Vector<Complex>) -> Complex {
-        assert_eq!(self.size(), v.size(), "vector dimensions must match");
-        let mut acc = Complex::zero();
-        for (&lhs, &rhs) in self.data.iter().zip(v.data.iter()) {
-            acc += lhs * rhs;
-        }
-        acc
-    }
-
-    pub fn hermitian_dot(&self, v: &Vector<Complex>) -> Complex {
-        assert_eq!(self.size(), v.size(), "vector dimensions must match");
-        let mut acc = Complex::zero();
-        for (&lhs, &rhs) in self.data.iter().zip(v.data.iter()) {
-            acc += lhs.conj() * rhs;
-        }
-        acc
-    }
-
-    pub fn norm_1(&self) -> f32 {
-        let mut sum = 0.0;
-        for &value in &self.data {
-            sum += value.abs();
-        }
-        sum
-    }
-
-    pub fn norm(&self) -> f32 {
-        let mut squared = 0.0;
-        for &value in &self.data {
-            squared += value.abs_sq();
-        }
-        squared.powf(0.5)
-    }
-
-    pub fn norm_inf(&self) -> f32 {
-        let mut best: f32 = 0.0;
-        for &value in &self.data {
-            best = best.max(value.abs());
-        }
-        best
-    }
-}
-
-impl Add for Vector<f32> {
-    type Output = Self;
-
-    fn add(self, rhs: Self) -> Self::Output {
-        assert_eq!(self.size(), rhs.size(), "vector dimensions must match");
-        let data = self
-            .data
-            .into_iter()
-            .zip(rhs.data)
-            .map(|(lhs, rhs)| lhs + rhs)
-            .collect();
-        Self { data }
-    }
-}
-
-impl Sub for Vector<f32> {
-    type Output = Self;
-
-    fn sub(self, rhs: Self) -> Self::Output {
-        assert_eq!(self.size(), rhs.size(), "vector dimensions must match");
-        let data = self
-            .data
-            .into_iter()
-            .zip(rhs.data)
-            .map(|(lhs, rhs)| lhs - rhs)
-            .collect();
-        Self { data }
-    }
-}
-
-impl Mul<f32> for Vector<f32> {
-    type Output = Self;
-
-    fn mul(self, rhs: f32) -> Self::Output {
-        let data = self.data.into_iter().map(|value| value * rhs).collect();
-        Self { data }
-    }
-}
-
-impl Add for Vector<Complex> {
-    type Output = Self;
-
-    fn add(self, rhs: Self) -> Self::Output {
-        assert_eq!(self.size(), rhs.size(), "vector dimensions must match");
-        let data = self
-            .data
-            .into_iter()
-            .zip(rhs.data)
-            .map(|(lhs, rhs)| lhs + rhs)
-            .collect();
-        Self { data }
-    }
-}
-
-impl Sub for Vector<Complex> {
-    type Output = Self;
-
-    fn sub(self, rhs: Self) -> Self::Output {
-        assert_eq!(self.size(), rhs.size(), "vector dimensions must match");
-        let data = self
-            .data
-            .into_iter()
-            .zip(rhs.data)
-            .map(|(lhs, rhs)| lhs - rhs)
-            .collect();
-        Self { data }
-    }
-}
-
-impl Mul<Complex> for Vector<Complex> {
-    type Output = Self;
-
-    fn mul(self, rhs: Complex) -> Self::Output {
-        let data = self.data.into_iter().map(|value| value * rhs).collect();
-        Self { data }
-    }
-}
-
-impl Mul<f32> for Vector<Complex> {
-    type Output = Self;
-
-    fn mul(self, rhs: f32) -> Self::Output {
-        let data = self.data.into_iter().map(|value| value * rhs).collect();
-        Self { data }
     }
 }

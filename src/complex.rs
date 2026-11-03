@@ -1,7 +1,7 @@
-use std::fmt::{Display, Formatter};
+use std::fmt::{self, Display, Formatter};
 use std::ops::{Add, AddAssign, Div, Mul, MulAssign, Neg, Sub, SubAssign};
 
-use crate::utils::{EPSILON, abs_f32};
+use crate::scalar::Scalar;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Complex {
@@ -13,43 +13,46 @@ impl Complex {
     pub const fn new(re: f32, im: f32) -> Self {
         Self { re, im }
     }
+}
 
-    pub const fn zero() -> Self {
+impl Scalar for Complex {
+    fn zero() -> Self {
         Self::new(0.0, 0.0)
     }
 
-    pub const fn one() -> Self {
+    fn one() -> Self {
         Self::new(1.0, 0.0)
     }
 
-    pub fn conj(self) -> Self {
+    fn from_f32(value: f32) -> Self {
+        Self::new(value, 0.0)
+    }
+
+    fn mul_add(self, a: Self, b: Self) -> Self {
+        // (x + iy)(u + iv) + (p + iq) = (xu - yv + p) + i(xv + yu + q)
+        let re = self.re.mul_add(a.re, (-self.im).mul_add(a.im, b.re));
+        let im = self.re.mul_add(a.im, self.im.mul_add(a.re, b.im));
+        Self::new(re, im)
+    }
+
+    fn conj(self) -> Self {
         Self::new(self.re, -self.im)
     }
 
-    pub fn abs_sq(self) -> f32 {
+    fn real(self) -> f32 {
+        self.re
+    }
+
+    fn modulus_sq(self) -> f32 {
         self.re.mul_add(self.re, self.im * self.im)
     }
 
-    pub fn abs(self) -> f32 {
-        self.abs_sq().powf(0.5)
+    fn modulus(self) -> f32 {
+        self.modulus_sq().powf(0.5)
     }
 
-    pub fn is_near_zero(self) -> bool {
-        abs_f32(self.re) <= EPSILON && abs_f32(self.im) <= EPSILON
-    }
-
-    pub fn normalize_near_zero(self) -> Self {
-        let re = if abs_f32(self.re) <= EPSILON {
-            0.0
-        } else {
-            self.re
-        };
-        let im = if abs_f32(self.im) <= EPSILON {
-            0.0
-        } else {
-            self.im
-        };
-        Self::new(re, im)
+    fn fmt_scalar(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        Display::fmt(self, f)
     }
 }
 
@@ -66,11 +69,11 @@ impl From<(f32, f32)> for Complex {
 }
 
 impl Display for Complex {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         if self.im < 0.0 {
-            write!(f, "{}-{}i", self.re, -self.im)
+            write!(f, "{:?}-{:?}i", self.re, -self.im)
         } else {
-            write!(f, "{}+{}i", self.re, self.im)
+            write!(f, "{:?}+{:?}i", self.re, self.im)
         }
     }
 }
@@ -129,29 +132,13 @@ impl MulAssign for Complex {
     }
 }
 
-impl Mul<f32> for Complex {
-    type Output = Self;
-
-    fn mul(self, rhs: f32) -> Self::Output {
-        Self::new(self.re * rhs, self.im * rhs)
-    }
-}
-
 impl Div for Complex {
     type Output = Self;
 
     fn div(self, rhs: Self) -> Self::Output {
-        let denom = rhs.re.mul_add(rhs.re, rhs.im * rhs.im);
+        let denom = rhs.modulus_sq();
         let re = self.re.mul_add(rhs.re, self.im * rhs.im) / denom;
         let im = self.im.mul_add(rhs.re, -(self.re * rhs.im)) / denom;
         Self::new(re, im)
-    }
-}
-
-impl Div<f32> for Complex {
-    type Output = Self;
-
-    fn div(self, rhs: f32) -> Self::Output {
-        Self::new(self.re / rhs, self.im / rhs)
     }
 }

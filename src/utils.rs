@@ -1,13 +1,21 @@
-pub const EPSILON: f32 = 1e-6;
-
+/// `|x|`, written by hand: the subject forbids the standard library's math functions.
 pub fn abs_f32(value: f32) -> f32 {
     if value < 0.0 { -value } else { value }
 }
 
-pub fn is_near_zero(value: f32) -> bool {
-    abs_f32(value) <= EPSILON
-}
-
-pub fn normalize_near_zero(value: f32) -> f32 {
-    if is_near_zero(value) { 0.0 } else { value }
+/// Squared threshold below which a value counts as zero during Gaussian elimination.
+///
+/// This is deliberately *not* `f32::EPSILON` used as an absolute bound.
+/// `f32::EPSILON` (~1.19e-7) is machine epsilon: the gap between 1.0 and the
+/// next f32, i.e. a *relative* precision. Rounding error left over by elimination
+/// grows with the magnitude of the entries and the number of steps, so a fixed
+/// absolute threshold is wrong at both ends of the scale: `1e-7 * I` is perfectly
+/// invertible, while leftovers like `3e-6` on entries around 30 are just noise.
+///
+/// The threshold is therefore `dim * f32::EPSILON * max|a_ij|` (the rule LAPACK
+/// and NumPy use for rank decisions). It is squared so complex moduli can be
+/// compared without taking a square root.
+pub fn zero_tolerance_sq(dim: usize, max_modulus_sq: f32) -> f32 {
+    let scale = dim as f32 * f32::EPSILON;
+    scale * scale * max_modulus_sq
 }

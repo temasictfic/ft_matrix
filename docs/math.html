@@ -1,0 +1,1218 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ft_matrix Math Guide</title>
+<meta name="description" content="Plain-language explanation of every piece of linear algebra in ft_matrix, with diagrams and worked examples.">
+<style>
+:root {
+  --bg: #fbfaf7;
+  --fg: #1d1d1f;
+  --muted: #5f6368;
+  --card: #ffffff;
+  --border: #e3e0d8;
+  --code-bg: #f2efe8;
+  --accent: #2563eb;
+  --accent-soft: #dbe6fd;
+  --accent2: #d9480f;
+  --accent3: #2b8a3e;
+  --accent4: #7048e8;
+  --grid: #ebe7de;
+  --axis: #b8b2a6;
+  --note-bg: #fff7e0;
+  --note-border: #f0c94a;
+  --fill: rgba(37, 99, 235, 0.14);
+  --fill2: rgba(217, 72, 15, 0.12);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #15161a;
+    --fg: #e8e6e1;
+    --muted: #a09d96;
+    --card: #1d1f24;
+    --border: #2f323a;
+    --code-bg: #262931;
+    --accent: #6ea0ff;
+    --accent-soft: #23314f;
+    --accent2: #ff8a50;
+    --accent3: #5cc979;
+    --accent4: #a68bff;
+    --grid: #262931;
+    --axis: #4a4e58;
+    --note-bg: #2b2616;
+    --note-border: #8a6d1a;
+    --fill: rgba(110, 160, 255, 0.18);
+    --fill2: rgba(255, 138, 80, 0.16);
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #15161a;
+  --fg: #e8e6e1;
+  --muted: #a09d96;
+  --card: #1d1f24;
+  --border: #2f323a;
+  --code-bg: #262931;
+  --accent: #6ea0ff;
+  --accent-soft: #23314f;
+  --accent2: #ff8a50;
+  --accent3: #5cc979;
+  --accent4: #a68bff;
+  --grid: #262931;
+  --axis: #4a4e58;
+  --note-bg: #2b2616;
+  --note-border: #8a6d1a;
+  --fill: rgba(110, 160, 255, 0.18);
+  --fill2: rgba(255, 138, 80, 0.16);
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; scroll-padding-top: 16px; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 17px/1.65 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+.layout {
+  display: grid;
+  grid-template-columns: 250px minmax(0, 1fr);
+  max-width: 1180px;
+  margin: 0 auto;
+}
+nav.toc {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+  padding: 28px 12px 28px 20px;
+  border-right: 1px solid var(--border);
+  font-size: 14.5px;
+}
+nav.toc .brand { font-weight: 700; font-size: 16px; margin-bottom: 4px; }
+nav.toc .sub { color: var(--muted); font-size: 13px; margin-bottom: 18px; }
+nav.toc ol { list-style: none; margin: 0; padding: 0; }
+nav.toc li { margin: 0; }
+nav.toc a {
+  display: block;
+  padding: 4px 8px;
+  border-radius: 6px;
+  color: var(--fg);
+  text-decoration: none;
+}
+nav.toc a:hover { background: var(--accent-soft); }
+nav.toc .group { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; margin: 16px 8px 4px; }
+nav.toc .ex { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; margin-right: 4px; }
+
+main { padding: 36px 48px 80px; min-width: 0; }
+header.hero h1 { font-size: 34px; line-height: 1.2; margin: 0 0 10px; letter-spacing: -0.01em; }
+header.hero p { color: var(--muted); margin: 0 0 8px; max-width: 70ch; }
+.theme-toggle {
+  float: right;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--fg);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+section { padding-top: 22px; margin-top: 30px; border-top: 1px solid var(--border); }
+section > h2 { font-size: 26px; margin: 0 0 4px; letter-spacing: -0.01em; }
+.tag {
+  display: inline-block;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-radius: 999px;
+  padding: 1px 10px;
+  margin-bottom: 10px;
+}
+h3 { font-size: 18.5px; margin: 26px 0 6px; }
+p, ul, ol { max-width: 74ch; }
+a { color: var(--accent); }
+
+.formula {
+  font-family: "Cambria Math", "STIX Two Math", "Latin Modern Math", Georgia, serif;
+  font-size: 20px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--accent);
+  border-radius: 8px;
+  padding: 12px 18px;
+  margin: 14px 0;
+  max-width: 74ch;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+.formula small { font-family: ui-sans-serif, system-ui, sans-serif; font-size: 14px; color: var(--muted); display: block; white-space: normal; }
+.m { font-family: "Cambria Math", "STIX Two Math", Georgia, serif; font-size: 1.06em; white-space: nowrap; }
+var { font-style: italic; }
+
+code, pre { font-family: ui-monospace, "Cascadia Code", "JetBrains Mono", Consolas, monospace; font-size: 14.5px; }
+code { background: var(--code-bg); padding: 1px 5px; border-radius: 4px; }
+pre {
+  background: var(--code-bg);
+  border-radius: 8px;
+  padding: 12px 16px;
+  overflow-x: auto;
+  max-width: 74ch;
+  line-height: 1.5;
+}
+pre code { background: none; padding: 0; }
+
+.example {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 18px;
+  margin: 16px 0;
+  max-width: 74ch;
+}
+.example > .label { font-size: 12.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--accent3); margin-bottom: 4px; }
+.example p { margin: 6px 0; }
+.code-ref { font-size: 14px; color: var(--muted); margin: 10px 0 0; }
+.code-ref code { font-size: 13.5px; }
+.note {
+  background: var(--note-bg);
+  border: 1px solid var(--note-border);
+  border-radius: 8px;
+  padding: 10px 16px;
+  margin: 16px 0;
+  max-width: 74ch;
+  font-size: 15.5px;
+}
+.note strong:first-child { margin-right: 4px; }
+
+.row { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; }
+.row > .text { flex: 1 1 340px; min-width: 0; }
+figure { margin: 10px 0; flex: 0 1 300px; }
+figure svg { width: 100%; height: auto; display: block; background: var(--card); border: 1px solid var(--border); border-radius: 10px; }
+figcaption { font-size: 13.5px; color: var(--muted); margin-top: 6px; text-align: center; }
+
+svg .grid line { stroke: var(--grid); stroke-width: 1; }
+svg .axis { stroke: var(--axis); stroke-width: 1.5; }
+svg .a1 { stroke: var(--accent); fill: none; stroke-width: 3; }
+svg .a2 { stroke: var(--accent2); fill: none; stroke-width: 3; }
+svg .a3 { stroke: var(--accent3); fill: none; stroke-width: 3; }
+svg .a4 { stroke: var(--accent4); fill: none; stroke-width: 3; }
+svg .thin { stroke-width: 1.5; stroke-dasharray: 5 4; }
+svg text { fill: var(--fg); font: 14px ui-sans-serif, system-ui, sans-serif; }
+svg text.c1 { fill: var(--accent); font-weight: 600; }
+svg text.c2 { fill: var(--accent2); font-weight: 600; }
+svg text.c3 { fill: var(--accent3); font-weight: 600; }
+svg text.c4 { fill: var(--accent4); font-weight: 600; }
+svg text.mut { fill: var(--muted); font-size: 12.5px; }
+svg .dot1 { fill: var(--accent); }
+svg .dot2 { fill: var(--accent2); }
+svg .dot3 { fill: var(--accent3); }
+svg .dot4 { fill: var(--accent4); }
+svg .fill1 { fill: var(--fill); }
+svg .fill2 { fill: var(--fill2); }
+svg .m1 { fill: var(--accent); }
+svg .m2 { fill: var(--accent2); }
+svg .m3 { fill: var(--accent3); }
+svg .m4 { fill: var(--accent4); }
+
+table.mat { border-collapse: collapse; margin: 6px 0; font-variant-numeric: tabular-nums; }
+.matrix {
+  display: inline-grid;
+  vertical-align: middle;
+  border-left: 2px solid var(--fg);
+  border-right: 2px solid var(--fg);
+  border-radius: 6px;
+  padding: 2px 8px;
+  gap: 1px 14px;
+  font-family: "Cambria Math", Georgia, serif;
+  font-size: 18px;
+  text-align: right;
+  margin: 0 4px;
+}
+.matrix.c2 { grid-template-columns: repeat(2, auto); }
+.matrix.c3 { grid-template-columns: repeat(3, auto); }
+.matrix.c4 { grid-template-columns: repeat(4, auto); }
+.matrix.c5 { grid-template-columns: repeat(5, auto); }
+.matrix.c1 { grid-template-columns: auto; }
+.matrix .hl { color: var(--accent2); font-weight: 700; }
+.matrix .hl1 { color: var(--accent); font-weight: 700; }
+.matrix .sep { border-left: 1px dashed var(--muted); padding-left: 10px; }
+.eq { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 10px 0; font-family: "Cambria Math", Georgia, serif; font-size: 19px; }
+
+.steps { counter-reset: step; list-style: none; padding: 0; max-width: 74ch; }
+.steps > li { counter-increment: step; position: relative; padding: 6px 0 10px 40px; border-left: 2px solid var(--border); margin-left: 12px; }
+.steps > li::before {
+  content: counter(step);
+  position: absolute; left: -13px; top: 6px;
+  width: 24px; height: 24px; border-radius: 50%;
+  background: var(--accent); color: var(--bg);
+  font-size: 13px; font-weight: 700; text-align: center; line-height: 24px;
+}
+
+.widget {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  margin: 18px 0;
+  max-width: 820px;
+}
+.widget .title { font-weight: 700; margin-bottom: 8px; }
+.widget .controls { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; margin-bottom: 10px; font-size: 15px; }
+.widget input[type=range] { width: 220px; accent-color: var(--accent); }
+.widget input[type=number] {
+  width: 64px; font: inherit; font-size: 15px;
+  padding: 3px 6px; border-radius: 6px;
+  border: 1px solid var(--border); background: var(--bg); color: var(--fg);
+}
+.widget button {
+  font: inherit; font-size: 14px;
+  border: 1px solid var(--border); background: var(--bg); color: var(--fg);
+  border-radius: 6px; padding: 3px 10px; cursor: pointer;
+}
+.widget button:hover { border-color: var(--accent); }
+.widget .out { font-family: ui-monospace, Consolas, monospace; font-size: 14.5px; }
+.widget .split { display: flex; flex-wrap: wrap; gap: 18px; align-items: flex-start; }
+.widget .split svg { flex: 0 1 320px; width: 320px; max-width: 100%; height: auto; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; }
+.widget .split .side { flex: 1 1 240px; min-width: 0; }
+.matin { display: inline-grid; grid-template-columns: repeat(2, auto); gap: 6px; padding: 4px 8px; border-left: 2px solid var(--fg); border-right: 2px solid var(--fg); border-radius: 6px; }
+.big { font-size: 22px; font-weight: 700; }
+.pos { color: var(--accent3); }
+.neg { color: var(--accent2); }
+
+.cheat { width: 100%; max-width: 900px; border-collapse: collapse; font-size: 15px; margin: 12px 0; }
+.cheat th, .cheat td { border-bottom: 1px solid var(--border); padding: 8px 10px; text-align: left; vertical-align: top; }
+.cheat th { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.cheat td:first-child { white-space: nowrap; }
+.table-wrap { overflow-x: auto; }
+
+footer { margin-top: 60px; color: var(--muted); font-size: 14px; }
+
+@media (max-width: 860px) {
+  .layout { grid-template-columns: 1fr; }
+  nav.toc { position: static; height: auto; border-right: none; border-bottom: 1px solid var(--border); padding: 18px 16px; }
+  nav.toc ol { columns: 2; column-gap: 12px; }
+  main { padding: 24px 16px 60px; }
+  header.hero h1 { font-size: 27px; }
+  .formula { font-size: 17px; }
+  .m { white-space: normal; overflow-wrap: anywhere; }
+  .eq { font-size: 16px; }
+  .matrix { font-size: 15px; gap: 1px 8px; padding: 2px 5px; }
+  .widget .split svg { width: 100%; }
+}
+@media (max-width: 480px) {
+  nav.toc ol { columns: 1; }
+}
+</style>
+</head>
+<body>
+<div class="layout">
+<nav class="toc" aria-label="Contents">
+  <div class="brand">ft_matrix</div>
+  <div class="sub">The math, explained</div>
+  <ol>
+    <li class="group">Foundations</li>
+    <li><a href="#basics">Scalars, vectors, matrices</a></li>
+    <li><a href="#fields">Fields &amp; the Scalar trait</a></li>
+    <li><a href="#fma">Fused multiply-add</a></li>
+    <li><a href="#complex">Complex numbers</a></li>
+    <li class="group">Vectors</li>
+    <li><a href="#ex00"><span class="ex">00</span>Add, subtract, scale</a></li>
+    <li><a href="#ex01"><span class="ex">01</span>Linear combination</a></li>
+    <li><a href="#ex02"><span class="ex">02</span>Linear interpolation</a></li>
+    <li><a href="#ex03"><span class="ex">03</span>Dot product</a></li>
+    <li><a href="#ex04"><span class="ex">04</span>Norms</a></li>
+    <li><a href="#ex05"><span class="ex">05</span>Cosine of an angle</a></li>
+    <li><a href="#ex06"><span class="ex">06</span>Cross product</a></li>
+    <li class="group">Matrices</li>
+    <li><a href="#matrices">What a matrix is</a></li>
+    <li><a href="#ex07"><span class="ex">07</span>Matrix multiplication</a></li>
+    <li><a href="#ex08"><span class="ex">08</span>Trace</a></li>
+    <li><a href="#ex09"><span class="ex">09</span>Transpose</a></li>
+    <li><a href="#ex10"><span class="ex">10</span>Row-echelon form</a></li>
+    <li><a href="#ex11"><span class="ex">11</span>Determinant</a></li>
+    <li><a href="#ex12"><span class="ex">12</span>Inverse</a></li>
+    <li><a href="#ex13"><span class="ex">13</span>Rank</a></li>
+    <li class="group">Bonus &amp; numerics</li>
+    <li><a href="#ex14"><span class="ex">14</span>Projection matrix</a></li>
+    <li><a href="#ex15"><span class="ex">15</span>Complex vector spaces</a></li>
+    <li><a href="#tolerance">Floating point &amp; tolerance</a></li>
+    <li><a href="#cheatsheet">Cheat sheet</a></li>
+  </ol>
+</nav>
+
+<main>
+<header class="hero">
+  <button class="theme-toggle" type="button" id="themeToggle" aria-label="Toggle light or dark theme">◐ Theme</button>
+  <h1>The math behind ft_matrix</h1>
+  <p>This page explains every operation in the library, from adding two vectors to building a 3D camera matrix. Each section gives the idea in plain words, the formula, a worked example with real numbers (mostly taken from the subject), and where to find it in the code.</p>
+  <p>You only need basic arithmetic to follow it. The examples build on each other, so read the sections in order.</p>
+</header>
+
+<!-- ============================================================ BASICS -->
+<section id="basics">
+  <h2>Scalars, vectors and matrices</h2>
+  <p>Three kinds of objects appear everywhere in this library:</p>
+  <ul>
+    <li><strong>Scalar</strong>: a single number, like <span class="m">3</span> or <span class="m">−0.5</span>. It's called a scalar because multiplying by it <em>scales</em> things.</li>
+    <li><strong>Vector</strong>: an ordered list of scalars, like <span class="m">[2, 3]</span>. In 2D you can draw it as an arrow from the origin to the point (2, 3). The number of entries is its <em>dimension</em> (<code>size()</code> in the code).</li>
+    <li><strong>Matrix</strong>: a rectangular grid of scalars with <var>m</var> rows and <var>n</var> columns. A matrix is really a <em>function</em> that turns vectors into other vectors (rotating, stretching, squashing, …). The <a href="#matrices">matrices section</a> explains why.</li>
+  </ul>
+  <div class="eq">
+    scalar <span class="m">3</span>
+    &nbsp;&nbsp;·&nbsp;&nbsp; vector <span class="matrix c1"><span>2</span><span>3</span></span>
+    &nbsp;&nbsp;·&nbsp;&nbsp; 2×3 matrix <span class="matrix c3"><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span></span>
+  </div>
+  <p>Conventions on this page: the entry in row <var>i</var>, column <var>j</var> of matrix <var>A</var> is written <span class="m"><var>A</var><sub><var>ij</var></sub></span>. Vectors are written as columns. <span class="m">Σ</span> ("sigma") means "add up all of these".</p>
+</section>
+
+<!-- ============================================================ FIELDS -->
+<section id="fields">
+  <h2>Fields and the <code>Scalar</code> trait</h2>
+  <span class="tag">src/scalar.rs</span>
+  <p>A <strong>field</strong> is any set of numbers where you can add, subtract, multiply and divide (except by zero) and the usual arithmetic rules hold. The two fields this project uses are:</p>
+  <ul>
+    <li><strong>ℝ</strong>, the real numbers, stored as <code>f32</code>;</li>
+    <li><strong>ℂ</strong>, the complex numbers, stored as the <code>Complex</code> struct (the ex15 bonus).</li>
+  </ul>
+  <p>Linear algebra only relies on those arithmetic rules, so every algorithm in this library can be written once for "any field <var>K</var>". In Rust, that "any field" is the <code>Scalar</code> trait. It lists what the algorithms need:</p>
+  <pre><code>zero(), one()      // 0 and 1
++ − × ÷ negate     // field arithmetic
+mul_add(a, b)      // self·a + b, one rounding (FMA)
+conj()             // conjugate; no-op for reals
+modulus()          // size |x|
+modulus_sq()       // |x|², no square root
+real()             // real part</code></pre>
+  <p>Because <code>Vector&lt;K&gt;</code> and <code>Matrix&lt;K&gt;</code> are written as <code>impl&lt;K: Scalar&gt;</code>, the determinant code that handles <code>f32</code> also handles <code>Complex</code>, with no copy-pasting.</p>
+</section>
+
+<!-- ============================================================ FMA -->
+<section id="fma">
+  <h2>Fused multiply-add (FMA)</h2>
+  <span class="tag">f32::mul_add · Scalar::mul_add</span>
+  <p>Almost every operation in linear algebra boils down to "multiply two numbers and add the result to a running total". FMA does exactly that in a single CPU instruction:</p>
+  <div class="formula">fma(<var>a</var>, <var>b</var>, <var>c</var>) = <var>a</var> × <var>b</var> + <var>c</var>
+    <small>computed with only one rounding at the end, instead of one after × and another after +</small></div>
+  <p>FMA is faster (one instruction instead of two) and more accurate (one rounding error instead of two). That's why the subject allows it in most exercises, and why the code writes <code>acc = x.mul_add(y, acc)</code> instead of <code>acc = acc + x * y</code>.</p>
+  <div class="example">
+    <div class="label">Example: a dot product with FMA</div>
+    <pre><code>acc = 0
+acc = fma(-1, 3, acc)   // -3
+acc = fma( 6, 2, acc)   // -3 + 12 = 9</code></pre>
+  </div>
+</section>
+
+<!-- ============================================================ COMPLEX -->
+<section id="complex">
+  <h2>Complex numbers</h2>
+  <span class="tag">src/complex.rs</span>
+  <div class="row">
+    <div class="text">
+      <p>A complex number <span class="m"><var>z</var> = <var>a</var> + <var>b</var>i</span> has a <em>real part</em> <var>a</var> and an <em>imaginary part</em> <var>b</var>. The symbol i is defined by <span class="m">i² = −1</span>. You can picture <var>z</var> as the point (<var>a</var>, <var>b</var>) on a plane, which is why <code>Complex</code> is just two <code>f32</code>s: <code>re</code> and <code>im</code>.</p>
+      <h3>The operations</h3>
+      <ul>
+        <li><strong>Add / subtract</strong>: part by part. <span class="m">(1+2i) + (3−i) = 4+i</span>.</li>
+        <li><strong>Multiply</strong>: expand the brackets and replace i² with −1:<br>
+          <span class="m">(<var>a</var>+<var>b</var>i)(<var>c</var>+<var>d</var>i) = (<var>ac</var> − <var>bd</var>) + (<var>ad</var> + <var>bc</var>)i</span></li>
+        <li><strong>Conjugate</strong>: flip the sign of the imaginary part, <span class="m"><span style="text-decoration:overline">z</span> = <var>a</var> − <var>b</var>i</span>. On the plane, that's a mirror image across the horizontal axis.</li>
+        <li><strong>Modulus</strong> (size): the distance from 0, <span class="m">|<var>z</var>| = √(<var>a</var>² + <var>b</var>²)</span>. A useful identity: <span class="m"><var>z</var>·<span style="text-decoration:overline">z</span> = |<var>z</var>|²</span>, which is always a real number.</li>
+        <li><strong>Divide</strong>: multiply the top and bottom by the conjugate of the bottom, so the bottom becomes the real number |<var>w</var>|²:<br>
+          <span class="m"><var>z</var> / <var>w</var> = <var>z</var>·<span style="text-decoration:overline">w</span> / |<var>w</var>|²</span></li>
+      </ul>
+    </div>
+    <figure>
+      <svg viewBox="0 0 300 260" role="img" aria-label="The complex number 3+4i, its conjugate 3−4i, and modulus 5">
+        <defs>
+          <marker id="ar1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="m1" d="M0,0 L10,5 L0,10 z"/></marker>
+          <marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="m2" d="M0,0 L10,5 L0,10 z"/></marker>
+          <marker id="ar3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="m3" d="M0,0 L10,5 L0,10 z"/></marker>
+          <marker id="ar4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="m4" d="M0,0 L10,5 L0,10 z"/></marker>
+        </defs>
+        <line class="axis" x1="20" y1="130" x2="290" y2="130"/>
+        <line class="axis" x1="60" y1="10" x2="60" y2="250"/>
+        <text class="mut" x="268" y="148">Re</text>
+        <text class="mut" x="66" y="22">Im</text>
+        <line class="a1" x1="60" y1="130" x2="165" y2="32" marker-end="url(#ar1)"/>
+        <line class="a2 thin" x1="60" y1="130" x2="165" y2="228" marker-end="url(#ar2)"/>
+        <line class="thin" stroke="var(--axis)" x1="168" y1="30" x2="168" y2="230"/>
+        <circle class="dot1" cx="168" cy="29" r="4"/>
+        <circle class="dot2" cx="168" cy="231" r="4"/>
+        <text class="c1" x="176" y="32">z = 3 + 4i</text>
+        <text class="c2" x="176" y="236">z̄ = 3 − 4i</text>
+        <text class="c1" x="78" y="74">|z| = 5</text>
+      </svg>
+      <figcaption>|3+4i| = √(9+16) = 5. The conjugate is the mirror image.</figcaption>
+    </figure>
+  </div>
+  <div class="example">
+    <div class="label">Worked examples</div>
+    <p>Multiply: <span class="m">(1+2i)(3−i) = 3 − i + 6i − 2i² = 3 + 5i + 2 = <strong>5 + 5i</strong></span></p>
+    <p>Divide: <span class="m">(1+2i)/(3−i) = (1+2i)(3+i) / (3² + 1²) = (1 + 7i) / 10 = <strong>0.1 + 0.7i</strong></span></p>
+    <p>Modulus: <span class="m">|3+4i| = √25 = <strong>5</strong></span></p>
+    <p class="code-ref">In the code: <code>impl Mul for Complex</code>, <code>impl Div for Complex</code>, <code>Scalar::conj</code>, <code>Scalar::modulus</code>. Complex multiply-add also uses FMA on each part.</p>
+  </div>
+</section>
+
+<!-- ============================================================ EX00 -->
+<section id="ex00">
+  <h2>Add, subtract and scale</h2>
+  <span class="tag">ex00 · Vector::add / sub / scl · Matrix::add / sub / scl</span>
+  <div class="row">
+    <div class="text">
+      <p>These are the two basic moves of a vector space.</p>
+      <p><strong>Addition</strong> works entry by entry. As arrows, it means "walk along <var>u</var>, then along <var>v</var>": put the tail of <var>v</var> on the tip of <var>u</var>, and <var>u</var>+<var>v</var> points to where you end up.</p>
+      <div class="formula">(<var>u</var> + <var>v</var>)<sub><var>i</var></sub> = <var>u</var><sub><var>i</var></sub> + <var>v</var><sub><var>i</var></sub>
+        &nbsp;&nbsp;&nbsp;&nbsp; (<var>u</var> − <var>v</var>)<sub><var>i</var></sub> = <var>u</var><sub><var>i</var></sub> − <var>v</var><sub><var>i</var></sub></div>
+      <p><strong>Scaling</strong> multiplies every entry by the same scalar λ. The arrow keeps its direction (or flips it if λ &lt; 0) and changes length.</p>
+      <div class="formula">(λ<var>u</var>)<sub><var>i</var></sub> = λ · <var>u</var><sub><var>i</var></sub></div>
+      <p>Matrices of the same shape are added, subtracted and scaled the same way, entry by entry.</p>
+    </div>
+    <figure>
+      <svg viewBox="0 0 300 240" role="img" aria-label="Vector addition: u=(2,1) plus v=(1,2) gives (3,3)">
+        <g class="grid">
+          <line x1="40" y1="200" x2="280" y2="200"/><line x1="40" y1="160" x2="280" y2="160"/><line x1="40" y1="120" x2="280" y2="120"/><line x1="40" y1="80" x2="280" y2="80"/><line x1="40" y1="40" x2="280" y2="40"/>
+          <line x1="40" y1="20" x2="40" y2="220"/><line x1="90" y1="20" x2="90" y2="220"/><line x1="140" y1="20" x2="140" y2="220"/><line x1="190" y1="20" x2="190" y2="220"/><line x1="240" y1="20" x2="240" y2="220"/>
+        </g>
+        <line class="a1" x1="40" y1="200" x2="137" y2="161" marker-end="url(#ar1)"/>
+        <line class="a2" x1="140" y1="160" x2="188" y2="83" marker-end="url(#ar2)"/>
+        <line class="a3" x1="40" y1="200" x2="187" y2="83" marker-end="url(#ar3)"/>
+        <line class="a2 thin" x1="40" y1="200" x2="88" y2="123"/>
+        <line class="a1 thin" x1="90" y1="120" x2="188" y2="81"/>
+        <text class="c1" x="92" y="198">u = [2, 1]</text>
+        <text class="c2" x="170" y="132">v = [1, 2]</text>
+        <text class="c3" x="196" y="78">u + v = [3, 3]</text>
+      </svg>
+      <figcaption>Going along u then v, or v then u, lands on the same point.</figcaption>
+    </figure>
+  </div>
+  <div class="example">
+    <div class="label">Examples from the subject</div>
+    <p><span class="m">[2, 3] + [5, 7] = [7, 10]</span> &nbsp;·&nbsp; <span class="m">[2, 3] − [5, 7] = [−3, −4]</span> &nbsp;·&nbsp; <span class="m">2 · [2, 3] = [4, 6]</span></p>
+    <div class="eq">
+      <span class="matrix c2"><span>1</span><span>2</span><span>3</span><span>4</span></span> +
+      <span class="matrix c2"><span>7</span><span>4</span><span>−2</span><span>2</span></span> =
+      <span class="matrix c2"><span>8</span><span>6</span><span>1</span><span>6</span></span>
+    </div>
+    <p class="code-ref">In the code: these methods modify <code>self</code> in place (the "accumulator" style the subject allows), so <code>u.add(&amp;v)</code> turns <code>u</code> into <code>u + v</code>. Cost: one operation per entry, O(n).</p>
+  </div>
+</section>
+
+<!-- ============================================================ EX01 -->
+<section id="ex01">
+  <h2>Linear combination</h2>
+  <span class="tag">ex01 · linear_combination</span>
+  <p>A <strong>linear combination</strong> scales several vectors and adds the results together. It's the single most important idea in linear algebra: matrix-vector multiplication, solving equations, and the meaning of "dimension" are all built on it.</p>
+  <div class="formula">λ<sub>1</sub><var>u</var><sub>1</sub> + λ<sub>2</sub><var>u</var><sub>2</sub> + … + λ<sub><var>k</var></sub><var>u</var><sub><var>k</var></sub></div>
+  <p>Think of the vectors <var>u</var> as ingredients and the coefficients λ as amounts. With the "standard basis" vectors <span class="m"><var>e</var><sub>1</sub>=[1,0,0]</span>, <span class="m"><var>e</var><sub>2</sub>=[0,1,0]</span>, <span class="m"><var>e</var><sub>3</sub>=[0,0,1]</span> you can mix any 3D vector at all. The coefficients are just its coordinates.</p>
+  <div class="example">
+    <div class="label">Examples from the subject</div>
+    <p><span class="m">10·[1,0,0] − 2·[0,1,0] + 0.5·[0,0,1] = <strong>[10, −2, 0.5]</strong></span></p>
+    <p><span class="m">10·[1, 2, 3] − 2·[0, 10, −100] = [10, 20, 30] + [0, −20, 200] = <strong>[10, 0, 230]</strong></span></p>
+    <p class="code-ref">In the code: one output vector, filled with <code>out[i] = u[i].mul_add(coef, out[i])</code> for each input vector. Each coordinate is touched once per vector, O(n) in the total number of coordinates.</p>
+  </div>
+</section>
+
+<!-- ============================================================ EX02 -->
+<section id="ex02">
+  <h2>Linear interpolation (lerp)</h2>
+  <span class="tag">ex02 · lerp · Lerp trait</span>
+  <p><strong>Lerp</strong> slides smoothly from <var>u</var> to <var>v</var> as a parameter <var>t</var> goes from 0 to 1. At <var>t</var>=0 you are at <var>u</var>, at <var>t</var>=1 you are at <var>v</var>, at <var>t</var>=0.5 you are exactly halfway. Games use it for animation, colour blending and camera moves.</p>
+  <div class="formula">lerp(<var>u</var>, <var>v</var>, <var>t</var>) = <var>u</var> + (<var>v</var> − <var>u</var>) · <var>t</var>
+    <small>Start at u, then walk a fraction t of the way along the arrow from u to v. Same as u·(1−t) + v·t.</small></div>
+  <div class="widget" id="lerpWidget">
+    <div class="title">Try it: drag t</div>
+    <div class="controls">
+      <label for="lerpT"><var>t</var> =</label>
+      <input type="range" id="lerpT" min="-0.25" max="1.25" step="0.01" value="0.3">
+      <span class="out" id="lerpTOut">0.30</span>
+    </div>
+    <div class="split">
+      <svg viewBox="0 0 320 200" id="lerpSvg" role="img" aria-label="Interactive lerp between u and v">
+        <line class="thin" stroke="var(--axis)" x1="10" y1="178" x2="310" y2="22"/>
+        <circle class="dot1" cx="60" cy="152" r="6"/>
+        <circle class="dot2" cx="260" cy="48" r="6"/>
+        <text class="c1" x="34" y="178">u = [2, 1]</text>
+        <text class="c2" x="226" y="34">v = [4, 2]</text>
+        <circle class="dot3" id="lerpPt" cx="120" cy="120" r="7"/>
+        <text class="c3" id="lerpLabel" x="130" y="114">p</text>
+      </svg>
+      <div class="side">
+        <p class="out" id="lerpCalc"></p>
+        <p style="font-size:15px;color:var(--muted)">Values of <var>t</var> outside [0, 1] still work: you keep moving along the same line past <var>u</var> or <var>v</var>. Ray tracers use this to describe rays.</p>
+      </div>
+    </div>
+  </div>
+  <div class="example">
+    <div class="label">Examples from the subject</div>
+    <p><span class="m">lerp(21, 42, 0.3) = 21 + (42 − 21)·0.3 = 21 + 6.3 = <strong>27.3</strong></span></p>
+    <p><span class="m">lerp([2, 1], [4, 2], 0.3) = [2 + 2·0.3, 1 + 1·0.3] = <strong>[2.6, 1.3]</strong></span></p>
+    <p>Matrices work entry by entry: halfway between <span class="m">[[2,1],[3,4]]</span> and <span class="m">[[20,10],[30,40]]</span> is <span class="m"><strong>[[11, 5.5], [16.5, 22]]</strong></span>.</p>
+    <p class="code-ref">In the code: the <code>Lerp</code> trait is implemented for every <code>Scalar</code>, for <code>Vector</code> and for <code>Matrix</code>. Each entry is one FMA: <code>(v − u).mul_add(t, u)</code>. If your program prints <code>27.300001</code>, that isn't a bug: <code>0.3</code> can't be stored exactly in an <code>f32</code> (it's really 0.30000001…).</p>
+  </div>
+</section>
+
+<!-- ============================================================ EX03 -->
+<section id="ex03">
+  <h2>Dot product</h2>
+  <span class="tag">ex03 · Vector::dot · Vector::hermitian_dot</span>
+  <p>The <strong>dot product</strong> turns two vectors into one number: multiply matching entries, then add everything up.</p>
+  <div class="formula"><var>u</var> · <var>v</var> = Σ<sub><var>i</var></sub> <var>u</var><sub><var>i</var></sub><var>v</var><sub><var>i</var></sub> = <var>u</var><sub>1</sub><var>v</var><sub>1</sub> + <var>u</var><sub>2</sub><var>v</var><sub>2</sub> + … + <var>u</var><sub><var>n</var></sub><var>v</var><sub><var>n</var></sub></div>
+  <p>Geometrically it measures <strong>how much two arrows point the same way</strong>, weighted by their lengths:</p>
+  <div class="formula"><var>u</var> · <var>v</var> = ‖<var>u</var>‖ · ‖<var>v</var>‖ · cos θ
+    <small>θ is the angle between the arrows, ‖·‖ is the length (see Norms).</small></div>
+  <ul>
+    <li>Positive: they point roughly the same way (θ &lt; 90°).</li>
+    <li>Zero: they are perpendicular (θ = 90°). The word for this is <em>orthogonal</em>.</li>
+    <li>Negative: they point roughly opposite ways (θ &gt; 90°).</li>
+  </ul>
+  <div class="example">
+    <div class="label">Examples from the subject</div>
+    <p><span class="m">[0, 0] · [1, 1] = 0</span> &nbsp;·&nbsp; <span class="m">[1, 1] · [1, 1] = 1 + 1 = 2</span> &nbsp;·&nbsp; <span class="m">[−1, 6] · [3, 2] = −3 + 12 = <strong>9</strong></span></p>
+  </div>
+  <h3>Why complex vectors need a conjugate</h3>
+  <p>For real vectors, <span class="m"><var>v</var>·<var>v</var> = Σ<var>v</var><sub><var>i</var></sub>²</span> is the squared length, which is always ≥ 0. For complex numbers that breaks: <span class="m">(1+2i)·(1+2i) = −3 + 4i</span>, which isn't even real, so it can't be a length.</p>
+  <p>The fix is to conjugate the first vector. This is the <strong>Hermitian</strong> (or <em>inner</em>) product:</p>
+  <div class="formula">⟨<var>u</var>, <var>v</var>⟩ = Σ<sub><var>i</var></sub> <span style="text-decoration:overline"><var>u</var><sub><var>i</var></sub></span> <var>v</var><sub><var>i</var></sub>
+    <small>Then ⟨v, v⟩ = Σ |vᵢ|², always real and ≥ 0. Example: (1−2i)(1+2i) = 5.</small></div>
+  <p class="code-ref">In the code: <code>dot</code> is the plain sum from the subject's prototype, and <code>hermitian_dot</code> conjugates the left side. For <code>f32</code>, <code>conj</code> does nothing, so the two give identical results. Both are one FMA per entry.</p>
+</section>
+
+<!-- ============================================================ EX04 -->
+<section id="ex04">
+  <h2>Norms: how long is a vector?</h2>
+  <span class="tag">ex04 · norm_1 · norm · norm_inf</span>
+  <div class="row">
+    <div class="text">
+      <p>A <strong>norm</strong> measures the size of a vector. There's more than one sensible way to measure "size", and the library implements the three most common ones:</p>
+      <div class="formula">‖<var>v</var>‖<sub>1</sub> = Σ |<var>v</var><sub><var>i</var></sub>|
+        <small><strong>Manhattan / taxicab</strong>: the distance a taxi drives on a grid of streets.</small></div>
+      <div class="formula">‖<var>v</var>‖<sub>2</sub> = √(Σ |<var>v</var><sub><var>i</var></sub>|²) = √⟨<var>v</var>, <var>v</var>⟩
+        <small><strong>Euclidean</strong>: the straight-line distance (Pythagoras). This is <code>norm()</code>.</small></div>
+      <div class="formula">‖<var>v</var>‖<sub>∞</sub> = max |<var>v</var><sub><var>i</var></sub>|
+        <small><strong>Supremum</strong>: the largest single coordinate.</small></div>
+    </div>
+    <figure>
+      <svg viewBox="0 0 260 260" role="img" aria-label="Unit balls of the 1-norm (diamond), 2-norm (circle) and infinity-norm (square)">
+        <line class="axis" x1="10" y1="130" x2="250" y2="130"/>
+        <line class="axis" x1="130" y1="10" x2="130" y2="250"/>
+        <rect class="a2" x="50" y="50" width="160" height="160"/>
+        <circle class="a1" cx="130" cy="130" r="80"/>
+        <polygon class="a3" points="130,50 210,130 130,210 50,130"/>
+        <text class="c3" x="140" y="96">‖v‖₁ = 1</text>
+        <text class="c1" x="186" y="214">‖v‖₂ = 1</text>
+        <text class="c2" x="150" y="44">‖v‖∞ = 1</text>
+      </svg>
+      <figcaption>All points at "distance 1" from the origin under each norm.</figcaption>
+    </figure>
+  </div>
+  <div class="example">
+    <div class="label">Examples from the subject</div>
+    <p>For <span class="m"><var>v</var> = [1, 2, 3]</span>: &nbsp; <span class="m">‖<var>v</var>‖<sub>1</sub> = 1+2+3 = <strong>6</strong></span>, &nbsp; <span class="m">‖<var>v</var>‖<sub>2</sub> = √(1+4+9) = √14 ≈ <strong>3.7417</strong></span>, &nbsp; <span class="m">‖<var>v</var>‖<sub>∞</sub> = <strong>3</strong></span></p>
+    <p>For <span class="m"><var>v</var> = [−1, −2]</span>: &nbsp; <strong>3</strong>, &nbsp; √5 ≈ <strong>2.236</strong>, &nbsp; <strong>2</strong>. Absolute values make the signs irrelevant.</p>
+    <p class="code-ref">In the code: <code>sqrt</code> isn't allowed, but <code>pow</code> is, so the square root is written <code>x.powf(0.5)</code>. <code>abs</code> isn't allowed either, so <code>utils::abs_f32</code> does it by hand. Norms always return a real <code>f32</code>, even for complex vectors (they use |<var>z</var>|).</p>
+  </div>
+</section>
+
+<!-- ============================================================ EX05 -->
+<section id="ex05">
+  <h2>Cosine of the angle between two vectors</h2>
+  <span class="tag">ex05 · angle_cos</span>
+  <div class="row">
+    <div class="text">
+      <p>Rearrange the geometric dot-product formula and you get the cosine of the angle between two vectors. No <code>cos</code> function is needed:</p>
+      <div class="formula">cos θ = (<var>u</var> · <var>v</var>) / (‖<var>u</var>‖ · ‖<var>v</var>‖)</div>
+      <p>Dividing by the lengths removes the effect of size, so only <em>direction</em> matters. The result is always between −1 and 1:</p>
+      <ul>
+        <li><strong>1</strong>: same direction (θ = 0°), e.g. [2, 1] and [4, 2]</li>
+        <li><strong>0</strong>: perpendicular (θ = 90°), e.g. [1, 0] and [0, 1]</li>
+        <li><strong>−1</strong>: opposite directions (θ = 180°), e.g. [−1, 1] and [1, −1]</li>
+      </ul>
+      <p>In statistics this exact formula is the <em>Pearson correlation coefficient</em>: how strongly two variables move together.</p>
+    </div>
+    <figure>
+      <svg viewBox="0 0 280 220" role="img" aria-label="Angle theta between u and v">
+        <line class="axis" x1="20" y1="190" x2="270" y2="190"/>
+        <line class="axis" x1="40" y1="10" x2="40" y2="210"/>
+        <line class="a1" x1="40" y1="190" x2="246" y2="140" marker-end="url(#ar1)"/>
+        <line class="a2" x1="40" y1="190" x2="137" y2="45" marker-end="url(#ar2)"/>
+        <path class="a3" d="M 108 174 A 70 70 0 0 0 79 132" stroke-width="2"/>
+        <text class="c3" x="100" y="152">θ</text>
+        <text class="c1" x="196" y="128">u</text>
+        <text class="c2" x="142" y="46">v</text>
+        <line class="thin" stroke="var(--axis)" x1="137" y1="45" x2="168" y2="173"/>
+        <text class="mut" x="150" y="206">shadow of v on u = ‖v‖ cos θ</text>
+      </svg>
+      <figcaption>The dot product is "length of u × length of v's shadow on u".</figcaption>
+    </figure>
+  </div>
+  <div class="example">
+    <div class="label">Example from the subject</div>
+    <p><span class="m"><var>u</var> = [1, 2, 3]</span>, <span class="m"><var>v</var> = [4, 5, 6]</span></p>
+    <p><span class="m"><var>u</var>·<var>v</var> = 4 + 10 + 18 = 32</span>, &nbsp; <span class="m">‖<var>u</var>‖ = √14</span>, &nbsp; <span class="m">‖<var>v</var>‖ = √77</span></p>
+    <p><span class="m">cos θ = 32 / √(14·77) = 32 / 32.83 ≈ <strong>0.974632</strong></span>, so the vectors are about 13° apart.</p>
+    <p class="code-ref">In the code: the result is clamped to [−1, 1], because rounding can produce values like −1.0000001 for exactly opposite vectors. For complex vectors the function uses the real part of ⟨<var>u</var>, <var>v</var>⟩, which gives the angle between them viewed as real vectors of twice the dimension.</p>
+  </div>
+</section>
+
+<!-- ============================================================ EX06 -->
+<section id="ex06">
+  <h2>Cross product</h2>
+  <span class="tag">ex06 · cross_product</span>
+  <div class="row">
+    <div class="text">
+      <p>The <strong>cross product</strong> only exists in 3D. It takes two vectors and returns a third one that is:</p>
+      <ul>
+        <li><strong>perpendicular to both</strong> inputs;</li>
+        <li><strong>as long as the area</strong> of the parallelogram they span;</li>
+        <li>pointing in the direction given by the <strong>right-hand rule</strong>: curl your fingers from <var>u</var> to <var>v</var>, and your thumb points along <var>u</var>×<var>v</var>.</li>
+      </ul>
+      <div class="formula"><var>u</var> × <var>v</var> = [ <var>u</var><sub>2</sub><var>v</var><sub>3</sub> − <var>u</var><sub>3</sub><var>v</var><sub>2</sub>, &nbsp;<var>u</var><sub>3</sub><var>v</var><sub>1</sub> − <var>u</var><sub>1</sub><var>v</var><sub>3</sub>, &nbsp;<var>u</var><sub>1</sub><var>v</var><sub>2</sub> − <var>u</var><sub>2</sub><var>v</var><sub>1</sub> ]
+        <small>Memory trick: for coordinate 1 use indices 2,3; for coordinate 2 use 3,1; for coordinate 3 use 1,2 (always "the next two", wrapping around).</small></div>
+      <p>Swapping the inputs flips the result: <span class="m"><var>v</var>×<var>u</var> = −(<var>u</var>×<var>v</var>)</span>. Parallel vectors give the zero vector, because the parallelogram is flat and has no area.</p>
+    </div>
+    <figure>
+      <svg viewBox="0 0 280 240" role="img" aria-label="Cross product perpendicular to the parallelogram of u and v">
+        <polygon class="fill1" points="80,180 200,200 250,150 130,130"/>
+        <line class="a1" x1="80" y1="180" x2="197" y2="199" marker-end="url(#ar1)"/>
+        <line class="a2" x1="80" y1="180" x2="128" y2="132" marker-end="url(#ar2)"/>
+        <line class="a3" x1="80" y1="180" x2="80" y2="34" marker-end="url(#ar3)"/>
+        <text class="c1" x="150" y="214">u</text>
+        <text class="c2" x="88" y="140">v</text>
+        <text class="c3" x="90" y="44">u × v</text>
+        <text class="mut" x="148" y="166">area = ‖u × v‖</text>
+      </svg>
+      <figcaption>u × v sticks straight out of the plane of u and v.</figcaption>
+    </figure>
+  </div>
+  <div class="example">
+    <div class="label">Example from the subject</div>
+    <p><span class="m">[1, 2, 3] × [4, 5, 6] = [2·6 − 3·5, &nbsp;3·4 − 1·6, &nbsp;1·5 − 2·4] = <strong>[−3, 6, −3]</strong></span></p>
+    <p>Check that it's perpendicular: <span class="m">[−3, 6, −3]·[1, 2, 3] = −3 + 12 − 9 = 0</span> ✓</p>
+    <p>Also from the subject: <span class="m">[0,0,1] × [1,0,0] = [0,1,0]</span> and <span class="m">[4,2,−3] × [−2,−5,16] = [17, −58, −16]</span>.</p>
+    <p class="code-ref">In the code: each coordinate is one FMA, <code>a.mul_add(b, -(c * d))</code>.</p>
+  </div>
+</section>
+
+<!-- ============================================================ MATRICES -->
+<section id="matrices">
+  <h2>What a matrix really is</h2>
+  <span class="tag">src/matrix.rs</span>
+  <p>A matrix is a compact description of a <strong>linear map</strong>: a function that moves vectors around while keeping grid lines straight, parallel and evenly spaced, and keeping the origin in place. Rotations, scalings, shears and reflections are all linear maps.</p>
+  <p>Here's the key fact: <strong>the columns of a matrix tell you where the basis vectors land.</strong> In 2D, the first column is where <span class="m">[1, 0]</span> goes and the second column is where <span class="m">[0, 1]</span> goes. Every other vector is a linear combination of those two, so it follows along.</p>
+  <div class="eq">
+    <span class="matrix c2"><span class="hl1">0</span><span class="hl">−1</span><span class="hl1">1</span><span class="hl">0</span></span>
+    <span style="font-size:16px;color:var(--muted)">→ [1,0] goes to <b style="color:var(--accent)">[0,1]</b>, &nbsp;[0,1] goes to <b style="color:var(--accent2)">[−1,0]</b>: a 90° rotation</span>
+  </div>
+  <p>A matrix with <var>m</var> rows and <var>n</var> columns takes <var>n</var>-dimensional vectors in and gives <var>m</var>-dimensional vectors out.</p>
+  <h3>How the library stores a matrix</h3>
+  <p>You <strong>write</strong> matrices row by row, the way the subject's examples do: <code>Matrix::from([[1., 2., 3.], [4., 5., 6.]])</code> is the 2×3 matrix with rows [1,2,3] and [4,5,6]. Printing also shows one row per line.</p>
+  <p>Internally, the numbers are stored in <strong>column-major</strong> order, one column after another, in a single flat <code>Vec</code>:</p>
+  <pre><code>matrix          stored as          index of (row, col)
+[1, 2, 3]   →   [1, 4, 2, 5, 3, 6]  =  col * rows + row
+[4, 5, 6]</code></pre>
+  <p>This matches the columns-are-where-vectors-go picture. It's also the layout OpenGL and the ex14 display program expect, and it makes reshaping a matrix into a vector (<code>to_vector</code>, <code>Vector::to_matrix</code>) free.</p>
+</section>
+
+<!-- ============================================================ EX07 -->
+<section id="ex07">
+  <h2>Matrix × vector and matrix × matrix</h2>
+  <span class="tag">ex07 · mul_vec · mul_mat</span>
+  <h3>Matrix × vector: apply the function</h3>
+  <p>There are two equivalent ways to read <span class="m"><var>A</var><var>u</var></span>:</p>
+  <ul>
+    <li><strong>Row view:</strong> entry <var>i</var> of the result is the dot product of row <var>i</var> of <var>A</var> with <var>u</var>.</li>
+    <li><strong>Column view:</strong> the result is a linear combination of the columns of <var>A</var>, using the entries of <var>u</var> as coefficients.</li>
+  </ul>
+  <div class="formula">(<var>A</var><var>u</var>)<sub><var>i</var></sub> = Σ<sub><var>j</var></sub> <var>A</var><sub><var>ij</var></sub> <var>u</var><sub><var>j</var></sub></div>
+  <div class="example">
+    <div class="label">Example</div>
+    <div class="eq">
+      <span class="matrix c2"><span class="hl1">3</span><span class="hl">−5</span><span class="hl1">6</span><span class="hl">8</span></span>
+      <span class="matrix c1"><span>4</span><span>2</span></span> =
+      4·<span class="matrix c1"><span class="hl1">3</span><span class="hl1">6</span></span> + 2·<span class="matrix c1"><span class="hl">−5</span><span class="hl">8</span></span> =
+      <span class="matrix c1"><span>12 − 10</span><span>24 + 16</span></span> =
+      <span class="matrix c1"><span>2</span><span>40</span></span>
+    </div>
+    <p class="code-ref">Cost: one FMA per matrix entry, O(<var>nm</var>).</p>
+  </div>
+  <h3>Matrix × matrix: compose two functions</h3>
+  <p><span class="m"><var>A</var><var>B</var></span> means "first apply <var>B</var>, then apply <var>A</var>". Entry (<var>i</var>, <var>j</var>) of the product is the dot product of <strong>row <var>i</var> of <var>A</var></strong> with <strong>column <var>j</var> of <var>B</var></strong>:</p>
+  <div class="formula">(<var>A</var><var>B</var>)<sub><var>ij</var></sub> = Σ<sub><var>k</var></sub> <var>A</var><sub><var>ik</var></sub> <var>B</var><sub><var>kj</var></sub>
+    <small>Only works when A has as many columns as B has rows. (m×n)·(n×p) gives m×p.</small></div>
+  <div class="example">
+    <div class="label">Example from the subject</div>
+    <div class="eq">
+      <span class="matrix c2"><span class="hl">3</span><span class="hl">−5</span><span>6</span><span>8</span></span>
+      <span class="matrix c2"><span class="hl">2</span><span>1</span><span class="hl">4</span><span>2</span></span> =
+      <span class="matrix c2"><span class="hl">3·2 − 5·4</span><span>3·1 − 5·2</span><span>6·2 + 8·4</span><span>6·1 + 8·2</span></span> =
+      <span class="matrix c2"><span class="hl">−14</span><span>−7</span><span>44</span><span>22</span></span>
+    </div>
+    <p>Order matters: in general <span class="m"><var>A</var><var>B</var> ≠ <var>B</var><var>A</var></span>. "Rotate, then stretch" isn't the same as "stretch, then rotate".</p>
+    <p class="code-ref">Cost: <var>m</var>·<var>p</var> entries, each a dot product of length <var>n</var>, so O(<var>nmp</var>).</p>
+  </div>
+</section>
+
+<!-- ============================================================ EX08 -->
+<section id="ex08">
+  <h2>Trace</h2>
+  <span class="tag">ex08 · trace</span>
+  <p>The <strong>trace</strong> of a square matrix is the sum of its main diagonal, from top-left to bottom-right.</p>
+  <div class="formula">tr(<var>A</var>) = Σ<sub><var>i</var></sub> <var>A</var><sub><var>ii</var></sub></div>
+  <div class="example">
+    <div class="label">Example from the subject</div>
+    <div class="eq">
+      tr <span class="matrix c3"><span class="hl">2</span><span>−5</span><span>0</span><span>4</span><span class="hl">3</span><span>7</span><span>−2</span><span>3</span><span class="hl">4</span></span> = 2 + 3 + 4 = <strong>9</strong>
+    </div>
+    <p>The trace looks too simple to matter, but it has a hidden meaning: it equals the sum of the matrix's eigenvalues, and it doesn't change when you change coordinate systems. Cost: O(<var>n</var>).</p>
+  </div>
+</section>
+
+<!-- ============================================================ EX09 -->
+<section id="ex09">
+  <h2>Transpose</h2>
+  <span class="tag">ex09 · transpose</span>
+  <p>The <strong>transpose</strong> mirrors a matrix across its main diagonal: rows become columns. An <var>m</var>×<var>n</var> matrix becomes <var>n</var>×<var>m</var>.</p>
+  <div class="formula">(<var>A</var><sup>T</sup>)<sub><var>ij</var></sub> = <var>A</var><sub><var>ji</var></sub></div>
+  <div class="example">
+    <div class="label">Example</div>
+    <div class="eq">
+      <span class="matrix c3"><span class="hl1">1</span><span class="hl1">2</span><span class="hl1">3</span><span class="hl">4</span><span class="hl">5</span><span class="hl">6</span></span><sup>T</sup> =
+      <span class="matrix c2"><span class="hl1">1</span><span class="hl">4</span><span class="hl1">2</span><span class="hl">5</span><span class="hl1">3</span><span class="hl">6</span></span>
+    </div>
+    <p>A handy link to the dot product: <span class="m"><var>u</var>·<var>v</var> = <var>u</var><sup>T</sup><var>v</var></span> (a 1×n row times an n×1 column).</p>
+    <p class="code-ref">Cost: one copy per entry, O(<var>nm</var>). For complex matrices you will often want the <em>conjugate transpose</em> instead (transpose, then conjugate every entry); it's the matrix version of the Hermitian product.</p>
+  </div>
+</section>
+
+<!-- ============================================================ EX10 -->
+<section id="ex10">
+  <h2>Row-echelon form (Gaussian elimination)</h2>
+  <span class="tag">ex10 · row_echelon · reduce · find_pivot · eliminate</span>
+  <p>This is the workhorse algorithm of the library: <strong>determinant, inverse and rank are all built on it.</strong> It simplifies a matrix using three moves that never change the solutions of the linear system the matrix represents:</p>
+  <ol>
+    <li><strong>Swap</strong> two rows.</li>
+    <li><strong>Scale</strong> a row by a non-zero number.</li>
+    <li><strong>Add a multiple</strong> of one row to another row.</li>
+  </ol>
+  <p>The goal is the <strong>reduced row-echelon form</strong> (RREF), a staircase shape:</p>
+  <ul>
+    <li>each row's first non-zero entry (its <em>pivot</em>) is 1;</li>
+    <li>each pivot is to the right of the pivot in the row above;</li>
+    <li>each pivot is the only non-zero entry in its column;</li>
+    <li>all-zero rows sit at the bottom.</li>
+  </ul>
+  <h3>The algorithm, column by column</h3>
+  <ol class="steps">
+    <li><strong>Find a pivot.</strong> Among the rows not used yet, pick the one with the <em>largest</em> absolute value in this column (<code>find_pivot</code>). This is called <em>partial pivoting</em>: dividing by large numbers keeps rounding errors small. If every candidate is zero (within <a href="#tolerance">tolerance</a>), skip the column.</li>
+    <li><strong>Swap</strong> that row up into position.</li>
+    <li><strong>Scale</strong> the row so the pivot becomes exactly 1.</li>
+    <li><strong>Eliminate</strong>: for every other row, subtract (that row's entry in this column) × (pivot row), which turns the entry into 0 (<code>eliminate</code>).</li>
+    <li>Move to the next row and the next column.</li>
+  </ol>
+  <div class="example">
+    <div class="label">Worked example: [[1, 2], [3, 4]]</div>
+    <div class="eq">
+      <span class="matrix c2"><span>1</span><span>2</span><span class="hl">3</span><span>4</span></span>
+      <span style="font-size:14px;color:var(--muted)">swap: 3 is the largest in column 1 →</span>
+      <span class="matrix c2"><span class="hl">3</span><span>4</span><span>1</span><span>2</span></span>
+      <span style="font-size:14px;color:var(--muted)">row1 ÷ 3 →</span>
+      <span class="matrix c2"><span>1</span><span>4/3</span><span>1</span><span>2</span></span>
+    </div>
+    <div class="eq">
+      <span style="font-size:14px;color:var(--muted)">row2 − 1·row1 →</span>
+      <span class="matrix c2"><span>1</span><span>4/3</span><span>0</span><span class="hl">2/3</span></span>
+      <span style="font-size:14px;color:var(--muted)">row2 ÷ 2/3 →</span>
+      <span class="matrix c2"><span>1</span><span>4/3</span><span>0</span><span>1</span></span>
+      <span style="font-size:14px;color:var(--muted)">row1 − 4/3·row2 →</span>
+      <span class="matrix c2"><span>1</span><span>0</span><span>0</span><span>1</span></span>
+    </div>
+    <p>The result is the identity matrix, which tells us the original matrix is invertible (see <a href="#ex12">Inverse</a>).</p>
+  </div>
+  <div class="example">
+    <div class="label">Worked example: [[1, 2], [2, 4]] (a dependent row)</div>
+    <div class="eq">
+      <span class="matrix c2"><span>1</span><span>2</span><span>2</span><span>4</span></span> →
+      <span class="matrix c2"><span>2</span><span>4</span><span>1</span><span>2</span></span> →
+      <span class="matrix c2"><span>1</span><span>2</span><span>1</span><span>2</span></span> →
+      <span class="matrix c2"><span>1</span><span>2</span><span class="hl">0</span><span class="hl">0</span></span>
+    </div>
+    <p>Row 2 was just 2 × row 1, so it carried no new information and reduced to zeros. Only one pivot was found.</p>
+  </div>
+  <p>The subject's larger example reduces <span class="m">[[8, 5, −2, 4, 28], [4, 2.5, 20, 4, −4], [8, 5, 1, 4, 17]]</span> to <span class="m">[[1, 0.625, 0, 0, −12.17], [0, 0, 1, 0, −3.67], [0, 0, 0, 1, 29.5]]</span>. Column 2 gets no pivot because it's just 0.625 × column 1.</p>
+  <p class="code-ref">Cost: for each of up to <var>n</var> pivots, update up to <var>n</var> rows of up to <var>n</var> entries, so O(<var>n</var>³). The code writes the pivot as an exact <code>1</code> and the eliminated entries as an exact <code>0</code> instead of computing them, so no rounding dust is left behind.</p>
+</section>
+
+<!-- ============================================================ EX11 -->
+<section id="ex11">
+  <h2>Determinant</h2>
+  <span class="tag">ex11 · determinant</span>
+  <p>The <strong>determinant</strong> of a square matrix is one number that says <strong>how much the matrix scales areas</strong> (in 2D) or volumes (in 3D):</p>
+  <ul>
+    <li><span class="m">|det| = 3</span>: every shape becomes 3 times bigger.</li>
+    <li><span class="m">det &lt; 0</span>: space gets flipped, like a mirror image (orientation reverses).</li>
+    <li><span class="m">det = 0</span>: space gets squashed flat onto a line or a point. Information is lost, and the matrix has <strong>no inverse</strong>.</li>
+  </ul>
+  <div class="formula">det <span class="matrix c2" style="font-size:17px"><span><var>a</var></span><span><var>b</var></span><span><var>c</var></span><span><var>d</var></span></span> = <var>a</var><var>d</var> − <var>b</var><var>c</var>
+    <small>The signed area of the parallelogram spanned by the columns [a, c] and [b, d].</small></div>
+
+  <div class="widget" id="detWidget">
+    <div class="title">Try it: edit the matrix and watch the unit square</div>
+    <div class="controls">
+      <span class="matin">
+        <input type="number" step="0.5" id="da" value="2" aria-label="a">
+        <input type="number" step="0.5" id="db" value="1" aria-label="b">
+        <input type="number" step="0.5" id="dc" value="0.5" aria-label="c">
+        <input type="number" step="0.5" id="dd" value="1.5" aria-label="d">
+      </span>
+      <button type="button" data-m="1,0,0,1">identity</button>
+      <button type="button" data-m="2,0,0,2">scale ×2</button>
+      <button type="button" data-m="1,1,0,1">shear</button>
+      <button type="button" data-m="0,1,1,0">mirror</button>
+      <button type="button" data-m="1,2,1,2">squash</button>
+    </div>
+    <div class="split">
+      <svg viewBox="-160 -160 320 320" id="detSvg" role="img" aria-label="Unit square transformed by a 2x2 matrix">
+        <g class="grid" id="detGrid"></g>
+        <line class="axis" x1="-160" y1="0" x2="160" y2="0"/>
+        <line class="axis" x1="0" y1="-160" x2="0" y2="160"/>
+        <polygon class="a3 thin" points="0,0 40,0 40,-40 0,-40"/>
+        <polygon id="detPoly" class="fill1" stroke="var(--accent)" stroke-width="2"/>
+        <line id="detC1" class="a1" marker-end="url(#ar1)"/>
+        <line id="detC2" class="a2" marker-end="url(#ar2)"/>
+      </svg>
+      <div class="side">
+        <p>Column 1 <span style="color:var(--accent)">●</span> is where [1, 0] lands. Column 2 <span style="color:var(--accent2)">●</span> is where [0, 1] lands. The dashed green square has area 1.</p>
+        <p class="out" id="detCalc"></p>
+        <p class="big" id="detVal"></p>
+        <p id="detMsg" style="font-size:15px"></p>
+      </div>
+    </div>
+  </div>
+
+  <h3>How the code computes it: elimination</h3>
+  <p>The textbook cofactor formula takes about <var>n</var>! steps, which gets slow fast. The code uses Gaussian elimination instead, because of three facts:</p>
+  <ul>
+    <li>The determinant of a <strong>triangular</strong> matrix (all zeros below the diagonal) is the product of its diagonal.</li>
+    <li>Adding a multiple of one row to another <strong>doesn't change</strong> the determinant (a shear doesn't change area).</li>
+    <li>Swapping two rows <strong>flips its sign</strong>.</li>
+  </ul>
+  <p>So: eliminate down to triangular form, multiply the pivots together, and flip the sign once per row swap. That's O(<var>n</var>³) and works for any size, not just the 4×4 the subject requires.</p>
+  <div class="example">
+    <div class="label">Worked example from the subject (answer: −174)</div>
+    <div class="eq">
+      <span class="matrix c3"><span class="hl">8</span><span>5</span><span>−2</span><span>4</span><span>7</span><span>20</span><span>7</span><span>6</span><span>1</span></span>
+      <span style="font-size:14px;color:var(--muted)">row2 − ½·row1, row3 − ⅞·row1 →</span>
+      <span class="matrix c3"><span>8</span><span>5</span><span>−2</span><span>0</span><span class="hl">4.5</span><span>21</span><span>0</span><span>1.625</span><span>2.75</span></span>
+      <span style="font-size:14px;color:var(--muted)">row3 − 0.3611·row2 →</span>
+      <span class="matrix c3"><span>8</span><span>5</span><span>−2</span><span>0</span><span>4.5</span><span>21</span><span>0</span><span>0</span><span class="hl">−4.8333</span></span>
+    </div>
+    <p>No swaps were needed, so <span class="m">det = 8 × 4.5 × (−4.8333…) = <strong>−174</strong></span>.</p>
+    <p>Check with the cofactor formula: <span class="m">8(7·1 − 20·6) − 5(4·1 − 20·7) + (−2)(4·6 − 7·7) = −904 + 680 + 50 = −174</span> ✓</p>
+    <p class="code-ref">The program prints <code>-173.99998</code>: f32 has about 7 significant digits, and this is rounding in the last one. The subject explicitly allows approximate results.</p>
+  </div>
+</section>
+
+<!-- ============================================================ EX12 -->
+<section id="ex12">
+  <h2>Inverse</h2>
+  <span class="tag">ex12 · inverse</span>
+  <p>The <strong>inverse</strong> <span class="m"><var>A</var><sup>−1</sup></span> undoes what <var>A</var> does: <span class="m"><var>A</var><sup>−1</sup><var>A</var> = <var>A</var><var>A</var><sup>−1</sup> = <var>I</var></span>, where <var>I</var> is the identity matrix (1s on the diagonal, 0s elsewhere), the matrix that does nothing.</p>
+  <p>It's how you "divide" by a matrix. To solve the system <span class="m"><var>A</var><var>x</var> = <var>b</var></span>, multiply both sides by <var>A</var><sup>−1</sup> to get <span class="m"><var>x</var> = <var>A</var><sup>−1</sup><var>b</var></span>.</p>
+  <p>A matrix is invertible exactly when <span class="m">det(<var>A</var>) ≠ 0</span>. A squashed space can't be un-squashed: many inputs landed on the same output, so there's no way to tell which one you started from. In that case the library returns <code>Err(MatrixError::SingularMatrix)</code>.</p>
+  <h3>Gauss-Jordan: elimination on [A | I]</h3>
+  <p>Put <var>A</var> and the identity side by side and run row reduction on both at once. When the left side becomes <var>I</var>, the right side has become <var>A</var><sup>−1</sup>. This works because the row operations you applied, multiplied together, <em>are</em> <var>A</var><sup>−1</sup>, and the right half records them.</p>
+  <div class="example">
+    <div class="label">Worked example: the subject's linear system</div>
+    <p>Solve <span class="m">2<var>x</var> + 3<var>y</var> = 8</span> and <span class="m">−7<var>x</var> + 4<var>y</var> = 2</span>.</p>
+    <div class="eq">
+      <span class="matrix c4"><span>2</span><span>3</span><span class="sep">1</span><span>0</span><span class="hl">−7</span><span>4</span><span class="sep">0</span><span>1</span></span>
+      <span style="font-size:14px;color:var(--muted)">swap, row1 ÷ −7 →</span>
+      <span class="matrix c4"><span>1</span><span>−4/7</span><span class="sep">0</span><span>−1/7</span><span>2</span><span>3</span><span class="sep">1</span><span>0</span></span>
+      <span style="font-size:14px;color:var(--muted)">row2 − 2·row1 →</span>
+      <span class="matrix c4"><span>1</span><span>−4/7</span><span class="sep">0</span><span>−1/7</span><span>0</span><span class="hl">29/7</span><span class="sep">1</span><span>2/7</span></span>
+    </div>
+    <div class="eq">
+      <span style="font-size:14px;color:var(--muted)">row2 ÷ 29/7, then row1 + 4/7·row2 →</span>
+      <span class="matrix c4"><span>1</span><span>0</span><span class="sep hl1">4/29</span><span class="hl1">−3/29</span><span>0</span><span>1</span><span class="sep hl1">7/29</span><span class="hl1">2/29</span></span>
+    </div>
+    <p>So <span class="m"><var>A</var><sup>−1</sup> = (1/29)·[[4, −3], [7, 2]]</span> and</p>
+    <p><span class="m">[<var>x</var>, <var>y</var>] = <var>A</var><sup>−1</sup>·[8, 2] = (1/29)·[32 − 6, 56 + 4] = <strong>[26/29, 60/29]</strong></span></p>
+    <p>For 2×2 there's also a shortcut: <span class="m">[[<var>a</var>,<var>b</var>],[<var>c</var>,<var>d</var>]]<sup>−1</sup> = 1/(<var>ad</var>−<var>bc</var>) · [[<var>d</var>, −<var>b</var>], [−<var>c</var>, <var>a</var>]]</span>. Notice the determinant in the denominator.</p>
+    <p class="code-ref">Cost: O(<var>n</var>³) time, and O(<var>n</var>²) space for the two working matrices. Inverting is numerically fragile when the matrix is <em>almost</em> singular, which is why pivots are chosen as large as possible.</p>
+  </div>
+</section>
+
+<!-- ============================================================ EX13 -->
+<section id="ex13">
+  <h2>Rank</h2>
+  <span class="tag">ex13 · rank</span>
+  <p>The <strong>rank</strong> is the number of dimensions that survive after the matrix is applied, i.e. the dimension of its output space (its <em>image</em>). Equivalently, it's the number of truly independent rows (or columns: the two counts are always equal).</p>
+  <p>To compute it, row-reduce and <strong>count the pivots</strong>. Rows that reduce to all zeros were combinations of other rows, so they add no new direction.</p>
+  <div class="example">
+    <div class="label">Examples from the subject</div>
+    <div class="eq">
+      rank <span class="matrix c4"><span>1</span><span>2</span><span>0</span><span>0</span><span class="hl">2</span><span class="hl">4</span><span class="hl">0</span><span class="hl">0</span><span>−1</span><span>2</span><span>1</span><span>1</span></span> = <strong>2</strong>
+      <span style="font-size:15px;color:var(--muted)">&nbsp; row 2 = 2 × row 1, so only 2 independent rows</span>
+    </div>
+    <p>The identity 3×3 has rank 3. The subject's 4×3 example has rank 3: four rows can't hold more than three independent directions in 3D.</p>
+  </div>
+  <h3>The rank-nullity theorem</h3>
+  <p>For a matrix with <var>n</var> columns (taking <var>n</var>-dimensional input):</p>
+  <div class="formula">rank(<var>A</var>) + nullity(<var>A</var>) = <var>n</var>
+    <small>nullity = dimension of the kernel: the set of inputs that get squashed to 0</small></div>
+  <p>In plain words: every input dimension either survives into the output or gets crushed to zero. Nothing just disappears. A 3×3 matrix with rank 2 squashes one whole direction (a line of inputs) down to the origin, so its determinant is 0 and it has no inverse.</p>
+  <p class="code-ref">In the code: <code>rank()</code> calls the same <code>reduce()</code> as <code>row_echelon()</code>, which returns the number of pivots it found. O(<var>n</var>³).</p>
+</section>
+
+<!-- ============================================================ EX14 -->
+<section id="ex14">
+  <h2>Projection matrix (3D → screen)</h2>
+  <span class="tag">ex14 · projection</span>
+  <p>A 3D renderer takes points in the world and turns them into points on a flat screen. The pipeline is <span class="m"><var>s</var> = <var>P</var> · <var>V</var> · <var>M</var> · <var>p</var></span>: the model matrix <var>M</var> places the object, the view matrix <var>V</var> moves the world so the camera sits at the origin, and the <strong>projection matrix</strong> <var>P</var>, the one this exercise builds, creates perspective, so that far things look smaller.</p>
+
+  <h3>Homogeneous coordinates: a 4th number</h3>
+  <p>Matrices always keep the origin fixed, so a 3×3 matrix can't move (translate) anything, and it can't divide by depth either. The trick is to add a 4th coordinate <var>w</var>: write the point <span class="m">(<var>x</var>, <var>y</var>, <var>z</var>)</span> as <span class="m">(<var>x</var>, <var>y</var>, <var>z</var>, 1)</span> and use 4×4 matrices. After multiplying, <strong>divide everything by <var>w</var></strong> (the <em>perspective divide</em>). If the matrix copies −<var>z</var> into <var>w</var>, that division shrinks distant points. That is exactly perspective.</p>
+
+  <div class="row">
+    <div class="text">
+      <h3>What the matrix contains</h3>
+      <p>Inputs: <code>fov</code> (vertical field of view, in radians), <code>ratio</code> (width ÷ height), <code>near</code> and <code>far</code> (the closest and farthest distances that get drawn). The visible region between them is a truncated pyramid called the <em>frustum</em>.</p>
+      <div class="eq" style="font-size:16px">
+        <var>P</var> =
+        <span class="matrix c4" style="font-size:15px">
+          <span><var>f</var>/ratio</span><span>0</span><span>0</span><span>0</span>
+          <span>0</span><span><var>f</var></span><span>0</span><span>0</span>
+          <span>0</span><span>0</span><span class="hl">far/(near−far)</span><span class="hl">far·near/(near−far)</span>
+          <span>0</span><span>0</span><span class="hl1">−1</span><span>0</span>
+        </span>
+      </div>
+      <p>with <span class="m"><var>f</var> = 1 / tan(fov / 2)</span>, the "zoom" (a narrower field of view gives a bigger <var>f</var>).</p>
+      <ul>
+        <li><strong>Rows 1–2</strong> scale x and y so the edges of the field of view land on the screen edges ±1. Dividing x by the ratio stops wide windows from stretching the image.</li>
+        <li><strong>Row 4</strong> sets <span class="m"><var>w</var> = −<var>z</var></span>, the distance in front of the camera. The camera looks down −<var>z</var> (right-handed convention).</li>
+        <li><strong>Row 3</strong> remaps depth so that, after dividing by <var>w</var>, the near plane goes to <strong>0</strong> and the far plane to <strong>1</strong>, the depth range the display program expects.</li>
+      </ul>
+    </div>
+    <figure>
+      <svg viewBox="0 0 300 220" role="img" aria-label="Side view of the view frustum between near and far planes">
+        <line class="axis" x1="20" y1="110" x2="290" y2="110"/>
+        <polygon class="fill1" points="80,92 280,30 280,190 80,128"/>
+        <line class="a4" x1="30" y1="110" x2="280" y2="30" stroke-width="1.5"/>
+        <line class="a4" x1="30" y1="110" x2="280" y2="190" stroke-width="1.5"/>
+        <line class="a1" x1="80" y1="92" x2="80" y2="128"/>
+        <line class="a2" x1="280" y1="30" x2="280" y2="190"/>
+        <circle class="dot3" cx="30" cy="110" r="5"/>
+        <text class="c3" x="10" y="134">eye</text>
+        <text class="c1" x="62" y="84">near</text>
+        <text class="c1" x="70" y="146">z→0</text>
+        <text class="c2" x="250" y="22">far</text>
+        <text class="c2" x="250" y="208">z→1</text>
+        <path class="a4" d="M 70 97 A 40 40 0 0 1 70 123" stroke-width="1.5"/>
+        <text class="c4" x="44" y="80">fov</text>
+        <text class="mut" x="150" y="114">looking down −z</text>
+      </svg>
+      <figcaption>Everything inside the frustum ends up in the box [−1,1] × [−1,1] × [0,1].</figcaption>
+    </figure>
+  </div>
+  <div class="example">
+    <div class="label">Check: near → 0, far → 1</div>
+    <p>A point on the near plane has <span class="m"><var>z</var> = −near</span>. Row 3 gives <span class="m">far·(−near)/(near−far) + far·near/(near−far) = 0</span>, and <span class="m"><var>w</var> = near</span>, so the depth is <span class="m">0 / near = <strong>0</strong></span> ✓</p>
+    <p>A point on the far plane has <span class="m"><var>z</var> = −far</span>. Row 3 gives <span class="m">(−far² + far·near)/(near−far) = far</span>, and <span class="m"><var>w</var> = far</span>, so the depth is <span class="m">far / far = <strong>1</strong></span> ✓</p>
+    <p class="code-ref">The display program reads the matrix in <strong>column-major</strong> order, one column per line, so <code>ex14</code> writes <code>./proj</code> that way. That's why the −1 shows up at the end of the third line. Run <code>cargo run --bin ex14 -- 70 1.78 0.1 100</code> to try other values. A test checks the near → 0 and far → 1 mapping.</p>
+  </div>
+</section>
+
+<!-- ============================================================ EX15 -->
+<section id="ex15">
+  <h2>Complex vector spaces (bonus)</h2>
+  <span class="tag">ex15 · K = Complex</span>
+  <p>The bonus asks you to redo every exercise with complex numbers as scalars. Because every algorithm is written against the <code>Scalar</code> trait, no algorithm had to be rewritten. Only a few <em>definitions</em> change, all because of the conjugate:</p>
+  <div class="table-wrap">
+  <table class="cheat">
+    <tr><th>Concept</th><th>Real (f32)</th><th>Complex</th></tr>
+    <tr><td>Size of a scalar</td><td>|<var>x</var>|</td><td>|<var>z</var>| = √(<var>a</var>² + <var>b</var>²)</td></tr>
+    <tr><td>Inner product</td><td>Σ <var>u</var><sub><var>i</var></sub><var>v</var><sub><var>i</var></sub></td><td>Σ <span style="text-decoration:overline"><var>u</var><sub><var>i</var></sub></span><var>v</var><sub><var>i</var></sub> (<code>hermitian_dot</code>)</td></tr>
+    <tr><td>Euclidean norm</td><td>√(Σ <var>v</var><sub><var>i</var></sub>²)</td><td>√(Σ |<var>v</var><sub><var>i</var></sub>|²): still a real number</td></tr>
+    <tr><td>"Natural" transpose</td><td><var>A</var><sup>T</sup></td><td>conjugate transpose <var>A</var><sup>*</sup></td></tr>
+    <tr><td>Pivot choice</td><td>largest |<var>x</var>|</td><td>largest |<var>z</var>|² (no square root needed)</td></tr>
+  </table>
+  </div>
+  <div class="example">
+    <div class="label">Example: rows that are dependent over ℂ</div>
+    <div class="eq">
+      <span class="matrix c2"><span>1+i</span><span>2</span><span>−1+i</span><span>2i</span></span>
+      <span style="font-size:15px;color:var(--muted)">&nbsp; row 2 = i × row 1, since i(1+i) = i + i² = −1+i and i·2 = 2i</span>
+    </div>
+    <p>So this matrix has rank 1, determinant 0 and no inverse, even though no entry is zero and the rows don't look alike. With complex numbers, "being a multiple" includes rotations by i.</p>
+  </div>
+</section>
+
+<!-- ============================================================ TOLERANCE -->
+<section id="tolerance">
+  <h2>Floating point and the zero tolerance</h2>
+  <span class="tag">src/utils.rs · zero_tolerance_sq</span>
+  <p>An <code>f32</code> keeps only about 7 significant digits, so almost every arithmetic step rounds. A value that should be exactly 0 after elimination often comes out as <code>0.00000024</code>. Elimination keeps asking "is this pivot zero?", and if rounding dust counts as non-zero, the algorithm picks garbage pivots: rank comes out too high, and singular matrices "invert" into huge nonsense.</p>
+  <p>So the library treats anything below a small threshold as zero. The question is which threshold.</p>
+  <h3>Why not just use <code>f32::EPSILON</code>?</h3>
+  <p><code>f32::EPSILON</code> ≈ 1.19 × 10<sup>−7</sup> is <strong>machine epsilon</strong>, the gap between 1.0 and the next representable <code>f32</code>. It's a <em>relative</em> precision: near 1 the rounding steps are about 10<sup>−7</sup>, near 1000 they are about 10<sup>−4</sup>, near 0.001 about 10<sup>−10</sup>. Any fixed threshold, whether 1.19e-7 or 1e-6, therefore fails somewhere:</p>
+  <ul>
+    <li>For a matrix with entries around 1000, the rounding dust (~10<sup>−4</sup>) is far above the threshold, so dust counts as data.</li>
+    <li>For <span class="m">10<sup>−7</sup> · <var>I</var></span>, a perfectly invertible matrix, every real entry is below the threshold, so the matrix looks like all zeros.</li>
+  </ul>
+  <h3>The fix: scale the threshold with the data</h3>
+  <div class="formula">tolerance = max(rows, cols) × f32::EPSILON × max |<var>A</var><sub><var>ij</var></sub>|
+    <small>Bigger matrices accumulate more rounding, hence the size factor. Bigger entries produce bigger dust, hence the max entry. LAPACK and NumPy use the same rule for rank.</small></div>
+  <div class="example">
+    <div class="label">Example</div>
+    <p>For <span class="m">[[1,2,3],[4,5,6],[7,8,9]]</span>: tolerance = 3 × 1.19e-7 × 9 ≈ <strong>3.2 × 10<sup>−6</sup></strong>. Scale the matrix by 1000 and the tolerance scales with it to 3.2 × 10<sup>−3</sup>, so it still correctly reports rank 2. The tests check this from 10<sup>−6</sup> up to 10<sup>6</sup>.</p>
+    <p class="code-ref">In the code: the comparison uses squared values, <span class="m">|<var>z</var>|² ≤ tolerance²</span>, so complex numbers need no square root and real and complex pivots are judged by exactly the same rule. After elimination, <code>flush_noise</code> applies the same tolerance (relative to the result's own scale) to tidy the output.</p>
+  </div>
+</section>
+
+<!-- ============================================================ CHEATSHEET -->
+<section id="cheatsheet">
+  <h2>Cheat sheet</h2>
+  <div class="table-wrap">
+  <table class="cheat">
+    <tr><th>Ex</th><th>Operation</th><th>Formula</th><th>Meaning</th><th>Cost</th></tr>
+    <tr><td>00</td><td>add / sub / scl</td><td><var>u</var><sub><var>i</var></sub> ± <var>v</var><sub><var>i</var></sub>, λ<var>u</var><sub><var>i</var></sub></td><td>combine and stretch arrows</td><td>O(n)</td></tr>
+    <tr><td>01</td><td>linear_combination</td><td>Σ λ<sub><var>k</var></sub><var>u</var><sub><var>k</var></sub></td><td>mix vectors with amounts</td><td>O(n)</td></tr>
+    <tr><td>02</td><td>lerp</td><td><var>u</var> + (<var>v</var>−<var>u</var>)<var>t</var></td><td>slide from u to v</td><td>O(n)</td></tr>
+    <tr><td>03</td><td>dot</td><td>Σ <var>u</var><sub><var>i</var></sub><var>v</var><sub><var>i</var></sub></td><td>alignment × lengths</td><td>O(n)</td></tr>
+    <tr><td>04</td><td>norm_1 / norm / norm_inf</td><td>Σ|<var>v</var><sub><var>i</var></sub>|, √Σ|<var>v</var><sub><var>i</var></sub>|², max|<var>v</var><sub><var>i</var></sub>|</td><td>length, measured three ways</td><td>O(n)</td></tr>
+    <tr><td>05</td><td>angle_cos</td><td><var>u</var>·<var>v</var> / (‖<var>u</var>‖‖<var>v</var>‖)</td><td>direction similarity, −1…1</td><td>O(n)</td></tr>
+    <tr><td>06</td><td>cross_product</td><td>[<var>u</var><sub>2</sub><var>v</var><sub>3</sub>−<var>u</var><sub>3</sub><var>v</var><sub>2</sub>, …]</td><td>perpendicular, length = area</td><td>O(1)</td></tr>
+    <tr><td>07</td><td>mul_vec / mul_mat</td><td>Σ<sub><var>k</var></sub> <var>A</var><sub><var>ik</var></sub><var>B</var><sub><var>kj</var></sub></td><td>apply / compose linear maps</td><td>O(nm) / O(nmp)</td></tr>
+    <tr><td>08</td><td>trace</td><td>Σ <var>A</var><sub><var>ii</var></sub></td><td>sum of the diagonal</td><td>O(n)</td></tr>
+    <tr><td>09</td><td>transpose</td><td><var>A</var><sub><var>ji</var></sub></td><td>rows ↔ columns</td><td>O(nm)</td></tr>
+    <tr><td>10</td><td>row_echelon</td><td>swap / scale / add rows</td><td>staircase form</td><td>O(n³)</td></tr>
+    <tr><td>11</td><td>determinant</td><td>± product of pivots</td><td>area/volume scale factor</td><td>O(n³)</td></tr>
+    <tr><td>12</td><td>inverse</td><td>reduce [<var>A</var> | <var>I</var>] → [<var>I</var> | <var>A</var><sup>−1</sup>]</td><td>undo the map</td><td>O(n³)</td></tr>
+    <tr><td>13</td><td>rank</td><td>number of pivots</td><td>surviving dimensions</td><td>O(n³)</td></tr>
+    <tr><td>14</td><td>projection</td><td><var>f</var> = 1/tan(fov/2), <var>w</var> = −<var>z</var></td><td>perspective for 3D</td><td>O(1)</td></tr>
+  </table>
+  </div>
+  <p>Want more intuition? The subject recommends 3Blue1Brown's video series <em>Essence of Linear Algebra</em>. It's the best visual companion to everything on this page.</p>
+</section>
+
+<footer>ft_matrix · an explanation of the code in <code>src/</code>. Every number on this page was checked against the library's output and its tests.</footer>
+</main>
+</div>
+
+<script>
+(function () {
+  // Theme toggle (remembered per browser when storage is available).
+  var root = document.documentElement;
+  try {
+    var saved = localStorage.getItem("ftm-theme");
+    if (saved === "light" || saved === "dark") root.setAttribute("data-theme", saved);
+  } catch (e) {}
+  document.getElementById("themeToggle").addEventListener("click", function () {
+    var current = root.getAttribute("data-theme");
+    if (!current) {
+      current = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    }
+    var next = current === "dark" ? "light" : "dark";
+    root.setAttribute("data-theme", next);
+    try { localStorage.setItem("ftm-theme", next); } catch (e) {}
+  });
+
+  function fmt(x) {
+    var r = Math.round(x * 100) / 100;
+    if (Object.is(r, -0)) r = 0;
+    return String(r);
+  }
+
+  // ---------------- lerp widget
+  var u = [2, 1], v = [4, 2];
+  // map world -> svg: u at (60,152), v at (260,48)
+  function lerpToSvg(p) {
+    var t = (p[0] - 2) / 2;
+    return [60 + 200 * t, 152 - 104 * t];
+  }
+  var slider = document.getElementById("lerpT");
+  function updateLerp() {
+    var t = parseFloat(slider.value);
+    var p = [u[0] + (v[0] - u[0]) * t, u[1] + (v[1] - u[1]) * t];
+    var s = lerpToSvg(p);
+    var pt = document.getElementById("lerpPt");
+    pt.setAttribute("cx", s[0]);
+    pt.setAttribute("cy", s[1]);
+    var lbl = document.getElementById("lerpLabel");
+    lbl.setAttribute("x", s[0] + 10);
+    lbl.setAttribute("y", s[1] + 22);
+    lbl.textContent = "[" + fmt(p[0]) + ", " + fmt(p[1]) + "]";
+    document.getElementById("lerpTOut").textContent = t.toFixed(2);
+    document.getElementById("lerpCalc").innerHTML =
+      "p = u + (v − u)·t<br>" +
+      "&nbsp;&nbsp;= [2, 1] + [2, 1]·" + t.toFixed(2) + "<br>" +
+      "&nbsp;&nbsp;= [" + fmt(p[0]) + ", " + fmt(p[1]) + "]";
+  }
+  slider.addEventListener("input", updateLerp);
+  updateLerp();
+
+  // ---------------- determinant widget
+  var S = 40; // pixels per unit
+  var grid = document.getElementById("detGrid");
+  var ns = "http://www.w3.org/2000/svg";
+  for (var i = -4; i <= 4; i++) {
+    if (i === 0) continue;
+    var h = document.createElementNS(ns, "line");
+    h.setAttribute("x1", -160); h.setAttribute("x2", 160);
+    h.setAttribute("y1", i * S); h.setAttribute("y2", i * S);
+    grid.appendChild(h);
+    var vl = document.createElementNS(ns, "line");
+    vl.setAttribute("y1", -160); vl.setAttribute("y2", 160);
+    vl.setAttribute("x1", i * S); vl.setAttribute("x2", i * S);
+    grid.appendChild(vl);
+  }
+  var ids = ["da", "db", "dc", "dd"];
+  function num(id) {
+    var x = parseFloat(document.getElementById(id).value);
+    return isFinite(x) ? x : 0;
+  }
+  function setLine(el, x, y) {
+    el.setAttribute("x1", 0); el.setAttribute("y1", 0);
+    el.setAttribute("x2", x * S); el.setAttribute("y2", -y * S);
+  }
+  function updateDet() {
+    var a = num("da"), b = num("db"), c = num("dc"), d = num("dd");
+    // columns: [a, c] and [b, d]
+    var pts = [[0, 0], [a, c], [a + b, c + d], [b, d]];
+    document.getElementById("detPoly").setAttribute("points",
+      pts.map(function (p) { return (p[0] * S) + "," + (-p[1] * S); }).join(" "));
+    setLine(document.getElementById("detC1"), a, c);
+    setLine(document.getElementById("detC2"), b, d);
+    var det = a * d - b * c;
+    document.getElementById("detCalc").textContent =
+      "det = a·d − b·c = " + fmt(a) + "·" + fmt(d) + " − " + fmt(b) + "·" + fmt(c);
+    var val = document.getElementById("detVal");
+    val.textContent = "= " + fmt(det);
+    val.className = "big " + (det < 0 ? "neg" : det > 0 ? "pos" : "");
+    var msg;
+    if (Math.abs(det) < 1e-9) {
+      msg = "Zero: the square is squashed flat onto a line. Two different inputs land on the same output, so the matrix has no inverse.";
+    } else if (det < 0) {
+      msg = "Negative: areas are scaled by " + fmt(Math.abs(det)) + " and the plane is flipped, like a mirror image.";
+    } else {
+      msg = "Positive: every area is multiplied by " + fmt(det) + ", and orientation is kept.";
+    }
+    document.getElementById("detMsg").textContent = msg;
+  }
+  ids.forEach(function (id) {
+    document.getElementById(id).addEventListener("input", updateDet);
+  });
+  Array.prototype.forEach.call(document.querySelectorAll("#detWidget button[data-m]"), function (btn) {
+    btn.addEventListener("click", function () {
+      var m = btn.getAttribute("data-m").split(",");
+      ids.forEach(function (id, k) { document.getElementById(id).value = m[k]; });
+      updateDet();
+    });
+  });
+  updateDet();
+})();
+</script>
+</body>
+</html>

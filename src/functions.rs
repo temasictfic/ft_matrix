@@ -1,110 +1,99 @@
-use std::ops::{Add, Mul, Sub};
-
-use crate::complex::Complex;
 use crate::matrix::Matrix;
-use crate::utils::is_near_zero;
+use crate::scalar::Scalar;
 use crate::vector::Vector;
 
-pub fn linear_combination(u: &[Vector<f32>], coefs: &[f32]) -> Vector<f32> {
+// ex01
+/// `Σ coefsᵢ·uᵢ`, O(n) in the total number of coordinates.
+pub fn linear_combination<K: Scalar>(u: &[Vector<K>], coefs: &[K]) -> Vector<K> {
     assert_eq!(
         u.len(),
         coefs.len(),
         "vector and coefficient counts must match"
     );
-    if u.is_empty() {
+    let Some(first) = u.first() else {
         return Vector::new(Vec::new());
-    }
-    let size = u[0].size();
-    for vector in u {
-        assert_eq!(vector.size(), size, "all vectors must have the same size");
-    }
+    };
+    let size = first.size();
+    assert!(
+        u.iter().all(|vector| vector.size() == size),
+        "all vectors must have the same size"
+    );
 
-    let mut out = vec![0.0; size];
-    for (vector, &coef) in u.iter().zip(coefs.iter()) {
+    let mut out = Vector::zeros(size);
+    for (vector, &coef) in u.iter().zip(coefs) {
         for idx in 0..size {
             out[idx] = vector[idx].mul_add(coef, out[idx]);
         }
     }
-    Vector::from(out)
+    out
 }
 
-pub fn lerp<V>(u: V, v: V, t: f32) -> V
-where
-    V: Sub<Output = V> + Add<Output = V> + Mul<f32, Output = V> + Clone,
-{
-    u.clone() + (v - u) * t
+// ex02
+/// Types that can be linearly interpolated: scalars, vectors and matrices.
+pub trait Lerp: Sized {
+    fn lerp_to(self, other: Self, t: f32) -> Self;
 }
 
-pub fn angle_cos(u: &Vector<f32>, v: &Vector<f32>) -> f32 {
+/// `u + (v - u)·t`, as a single fused multiply-add.
+impl<K: Scalar> Lerp for K {
+    fn lerp_to(self, other: Self, t: f32) -> Self {
+        (other - self).mul_add(K::from_f32(t), self)
+    }
+}
+
+pub fn lerp<V: Lerp>(u: V, v: V, t: f32) -> V {
+    u.lerp_to(v, t)
+}
+
+// ex05
+/// Cosine of the angle between `u` and `v`: `Re⟨u, v⟩ / (‖u‖·‖v‖)`.
+///
+/// Over the reals this is the usual `u·v / (‖u‖·‖v‖)`. Over the complex numbers
+/// it is the cosine of the real angle between the vectors seen as vectors of ℝ²ⁿ,
+/// which is why it is always a real number in [-1, 1].
+// Hand-written clamp: ex05 allows no math function besides fused multiply-add.
+#[allow(clippy::manual_clamp)]
+pub fn angle_cos<K: Scalar>(u: &Vector<K>, v: &Vector<K>) -> f32 {
     let norm_product = u.norm() * v.norm();
     assert!(
-        !is_near_zero(norm_product),
+        norm_product > 0.0,
         "angle cosine undefined for zero vectors"
     );
-    u.dot(v) / norm_product
+    let cos = u.hermitian_dot(v).real() / norm_product;
+    // Rounding can push colinear vectors slightly outside [-1, 1] (e.g. -1.0000001).
+    if cos > 1.0 {
+        1.0
+    } else if cos < -1.0 {
+        -1.0
+    } else {
+        cos
+    }
 }
 
-pub fn cross_product(u: &Vector<f32>, v: &Vector<f32>) -> Vector<f32> {
+// ex06
+pub fn cross_product<K: Scalar>(u: &Vector<K>, v: &Vector<K>) -> Vector<K> {
     assert_eq!(u.size(), 3, "cross product is defined for 3D vectors");
     assert_eq!(v.size(), 3, "cross product is defined for 3D vectors");
-    Vector::from(vec![
+    Vector::from([
         u[1].mul_add(v[2], -(u[2] * v[1])),
         u[2].mul_add(v[0], -(u[0] * v[2])),
         u[0].mul_add(v[1], -(u[1] * v[0])),
     ])
 }
 
+// ex14
+/// Right-handed perspective projection (the camera looks down -z), mapping depth to
+/// NDC z ∈ [0, 1]: the near plane goes to 0 and the far plane to 1.
+///
+/// `fov` is the vertical field of view in radians, `ratio` is width / height.
 pub fn projection(fov: f32, ratio: f32, near: f32, far: f32) -> Matrix<f32> {
     let focal = 1.0 / (fov * 0.5).tan();
-    let depth = far - near;
+    let depth = near - far;
 
-    let mut out = Matrix::<f32>::zeros(4, 4);
-    out.set(0, 0, focal / ratio);
-    out.set(1, 1, focal);
-    out.set(2, 2, far / depth);
-    out.set(2, 3, 1.0);
-    out.set(3, 2, -(far * near) / depth);
-    out
-}
-
-pub fn linear_combination_complex(u: &[Vector<Complex>], coefs: &[Complex]) -> Vector<Complex> {
-    assert_eq!(
-        u.len(),
-        coefs.len(),
-        "vector and coefficient counts must match"
-    );
-    if u.is_empty() {
-        return Vector::new(Vec::new());
-    }
-    let size = u[0].size();
-    for vector in u {
-        assert_eq!(vector.size(), size, "all vectors must have the same size");
-    }
-
-    let mut out = vec![Complex::zero(); size];
-    for (vector, &coef) in u.iter().zip(coefs.iter()) {
-        for idx in 0..size {
-            out[idx] += vector[idx] * coef;
-        }
-    }
-    Vector::from(out)
-}
-
-pub fn angle_cos_complex(u: &Vector<Complex>, v: &Vector<Complex>) -> Complex {
-    let norm_product = u.norm() * v.norm();
-    assert!(
-        !is_near_zero(norm_product),
-        "angle cosine undefined for zero vectors"
-    );
-    u.hermitian_dot(v) / Complex::from(norm_product)
-}
-
-pub fn cross_product_complex(u: &Vector<Complex>, v: &Vector<Complex>) -> Vector<Complex> {
-    assert_eq!(u.size(), 3, "cross product is defined for 3D vectors");
-    assert_eq!(v.size(), 3, "cross product is defined for 3D vectors");
-    Vector::from(vec![
-        u[1] * v[2] - u[2] * v[1],
-        u[2] * v[0] - u[0] * v[2],
-        u[0] * v[1] - u[1] * v[0],
+    Matrix::from([
+        [focal / ratio, 0.0, 0.0, 0.0],
+        [0.0, focal, 0.0, 0.0],
+        [0.0, 0.0, far / depth, (far * near) / depth],
+        [0.0, 0.0, -1.0, 0.0],
     ])
 }

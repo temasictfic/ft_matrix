@@ -1,11 +1,39 @@
 use ft_matrix::{Matrix, Vector};
 
 fn main() {
-    let m = Matrix::from([[3.0, -5.0], [6.0, 8.0]]);
-    let v = Vector::from([4.0, 2.0]);
-    println!("{}", m.mul_vec(&v));
+    let u = Matrix::from([[1., 0.], [0., 1.]]);
+    let v = Vector::from([4., 2.]);
+    println!("{}\n", u.mul_vec(&v));
+    // [4.]
+    // [2.]
 
-    let a = Matrix::from([[3.0, -5.0], [6.0, 8.0]]);
-    let b = Matrix::from([[2.0, 1.0], [4.0, 2.0]]);
-    println!("{}", a.mul_mat(&b));
+    let u = Matrix::from([[2., 0.], [0., 2.]]);
+    let v = Vector::from([4., 2.]);
+    println!("{}\n", u.mul_vec(&v));
+    // [8.]
+    // [4.]
+
+    let u = Matrix::from([[2., -2.], [-2., 2.]]);
+    let v = Vector::from([4., 2.]);
+    println!("{}\n", u.mul_vec(&v));
+    // [4.]
+    // [-4.]
+
+    let u = Matrix::from([[1., 0.], [0., 1.]]);
+    let v = Matrix::from([[1., 0.], [0., 1.]]);
+    println!("{}\n", u.mul_mat(&v));
+    // [1., 0.]
+    // [0., 1.]
+
+    let u = Matrix::from([[1., 0.], [0., 1.]]);
+    let v = Matrix::from([[2., 1.], [4., 2.]]);
+    println!("{}\n", u.mul_mat(&v));
+    // [2., 1.]
+    // [4., 2.]
+
+    let u = Matrix::from([[3., -5.], [6., 8.]]);
+    let v = Matrix::from([[2., 1.], [4., 2.]]);
+    println!("{}", u.mul_mat(&v));
+    // [-14., -7.]
+    // [44., 22.]
 }

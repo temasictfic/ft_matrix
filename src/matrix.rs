@@ -1,11 +1,16 @@
-use std::fmt::{Display, Formatter};
-use std::ops::{Add, Mul, Sub};
+use std::fmt::{self, Display, Formatter};
 
-use crate::complex::Complex;
 use crate::errors::MatrixError;
-use crate::utils::{abs_f32, is_near_zero, normalize_near_zero};
+use crate::functions::Lerp;
+use crate::scalar::Scalar;
+use crate::utils::zero_tolerance_sq;
 use crate::vector::Vector;
 
+/// A `rows` x `cols` matrix.
+///
+/// `Matrix::from([[a, b], [c, d]])` reads each inner array as a **row**, and
+/// `Display` prints one row per line, matching the subject's examples.
+/// Internally the coefficients are stored in column-major order.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Matrix<K> {
     data: Vec<K>,
@@ -13,21 +18,28 @@ pub struct Matrix<K> {
     cols: usize,
 }
 
-impl Matrix<f32> {
+impl<K: Scalar> Matrix<K> {
     pub fn zeros(rows: usize, cols: usize) -> Self {
-        Self {
-            data: vec![0.0; rows * cols],
-            rows,
-            cols,
-        }
+        Self::from_column_major(vec![K::zero(); rows * cols], rows, cols)
     }
 
     pub fn identity(size: usize) -> Self {
         let mut out = Self::zeros(size, size);
         for idx in 0..size {
-            out.set(idx, idx, 1.0);
+            out.set(idx, idx, K::one());
         }
         out
+    }
+
+    /// Builds a matrix from coefficients listed column by column.
+    pub fn from_column_major(data: Vec<K>, rows: usize, cols: usize) -> Self {
+        assert_eq!(data.len(), rows * cols, "data length must be rows * cols");
+        Self { data, rows, cols }
+    }
+
+    /// Reshapes into a vector, reading the coefficients column by column.
+    pub fn to_vector(&self) -> Vector<K> {
+        Vector::new(self.data.clone())
     }
 
     pub fn shape(&self) -> (usize, usize) {
@@ -39,14 +51,15 @@ impl Matrix<f32> {
     }
 
     fn index_of(&self, row: usize, col: usize) -> usize {
+        assert!(row < self.rows && col < self.cols, "index out of bounds");
         col * self.rows + row
     }
 
-    pub fn get(&self, row: usize, col: usize) -> f32 {
+    pub fn get(&self, row: usize, col: usize) -> K {
         self.data[self.index_of(row, col)]
     }
 
-    pub fn set(&mut self, row: usize, col: usize, value: f32) {
+    pub fn set(&mut self, row: usize, col: usize, value: K) {
         let idx = self.index_of(row, col);
         self.data[idx] = value;
     }
@@ -62,69 +75,147 @@ impl Matrix<f32> {
         }
     }
 
-    pub fn add(&mut self, v: &Matrix<f32>) {
-        assert_eq!(self.shape(), v.shape(), "matrix dimensions must match");
-        for (lhs, rhs) in self.data.iter_mut().zip(v.data.iter()) {
-            *lhs += *rhs;
+    /// Squared threshold below which a coefficient of this matrix counts as zero.
+    fn zero_tolerance_sq(&self) -> f32 {
+        let max_modulus_sq = self
+            .data
+            .iter()
+            .fold(0.0f32, |best, value| best.max(value.modulus_sq()));
+        zero_tolerance_sq(self.rows.max(self.cols), max_modulus_sq)
+    }
+
+    /// Flushes rounding noise (relative to this matrix's own scale) to exact zeros.
+    fn flush_noise(&mut self) {
+        let tolerance_sq = self.zero_tolerance_sq();
+        for value in &mut self.data {
+            if value.modulus_sq() <= tolerance_sq {
+                *value = K::zero();
+            }
         }
     }
 
-    pub fn sub(&mut self, v: &Matrix<f32>) {
-        assert_eq!(self.shape(), v.shape(), "matrix dimensions must match");
-        for (lhs, rhs) in self.data.iter_mut().zip(v.data.iter()) {
-            *lhs -= *rhs;
+    /// Partial pivoting: the row at or below `from_row` with the largest
+    /// coefficient in `col`, or `None` if they are all zero within tolerance.
+    fn find_pivot(&self, from_row: usize, col: usize, tolerance_sq: f32) -> Option<usize> {
+        let mut best_row = from_row;
+        let mut best_value = self.get(from_row, col).modulus_sq();
+        for row in (from_row + 1)..self.rows {
+            let candidate = self.get(row, col).modulus_sq();
+            if candidate > best_value {
+                best_value = candidate;
+                best_row = row;
+            }
+        }
+        (best_value > tolerance_sq).then_some(best_row)
+    }
+
+    /// `row -= factor * pivot_row`, from column `from_col` onwards.
+    fn eliminate(&mut self, row: usize, pivot_row: usize, factor: K, from_col: usize) {
+        for col in from_col..self.cols {
+            let value = (-factor).mul_add(self.get(pivot_row, col), self.get(row, col));
+            self.set(row, col, value);
         }
     }
 
-    pub fn scl(&mut self, a: f32) {
+    /// Gauss-Jordan elimination: returns the reduced row-echelon form and the rank.
+    fn reduce(&self) -> (Self, usize) {
+        let mut out = self.clone();
+        let tolerance_sq = self.zero_tolerance_sq();
+        let mut pivot_row = 0;
+
+        for lead_col in 0..out.cols {
+            if pivot_row == out.rows {
+                break;
+            }
+            let Some(best_row) = out.find_pivot(pivot_row, lead_col, tolerance_sq) else {
+                continue;
+            };
+            out.swap_rows(pivot_row, best_row);
+
+            // Columns left of `lead_col` are already zero in this row.
+            let pivot = out.get(pivot_row, lead_col);
+            for col in (lead_col + 1)..out.cols {
+                out.set(pivot_row, col, out.get(pivot_row, col) / pivot);
+            }
+            // Exact by definition; avoids leftovers like `1.0+5e-9i` for complex pivots.
+            out.set(pivot_row, lead_col, K::one());
+
+            for row in 0..out.rows {
+                let factor = out.get(row, lead_col);
+                if row != pivot_row && factor != K::zero() {
+                    out.eliminate(row, pivot_row, factor, lead_col + 1);
+                    out.set(row, lead_col, K::zero());
+                }
+            }
+            pivot_row += 1;
+        }
+
+        out.flush_noise();
+        (out, pivot_row)
+    }
+
+    // ex00
+    pub fn add(&mut self, v: &Matrix<K>) {
+        assert_eq!(self.shape(), v.shape(), "matrix dimensions must match");
+        for (lhs, &rhs) in self.data.iter_mut().zip(&v.data) {
+            *lhs += rhs;
+        }
+    }
+
+    pub fn sub(&mut self, v: &Matrix<K>) {
+        assert_eq!(self.shape(), v.shape(), "matrix dimensions must match");
+        for (lhs, &rhs) in self.data.iter_mut().zip(&v.data) {
+            *lhs -= rhs;
+        }
+    }
+
+    pub fn scl(&mut self, a: K) {
         for value in &mut self.data {
             *value *= a;
         }
     }
 
-    pub fn mul_vec(&self, vec: &Vector<f32>) -> Vector<f32> {
+    // ex07
+    /// `A·u`, O(nm) time and space.
+    pub fn mul_vec(&self, vec: &Vector<K>) -> Vector<K> {
         assert_eq!(
             self.cols,
             vec.size(),
             "incompatible matrix/vector dimensions"
         );
-        let mut out = vec![0.0; self.rows];
-        for (row, slot) in out.iter_mut().enumerate() {
-            let mut acc = 0.0;
-            for col in 0..self.cols {
-                acc = self.get(row, col).mul_add(vec[col], acc);
-            }
-            *slot = acc;
+        let mut out = Vector::zeros(self.rows);
+        for row in 0..self.rows {
+            out[row] = (0..self.cols).fold(K::zero(), |acc, col| {
+                self.get(row, col).mul_add(vec[col], acc)
+            });
         }
-        Vector::from(out)
+        out
     }
 
-    pub fn mul_mat(&self, mat: &Matrix<f32>) -> Matrix<f32> {
+    /// `A·B`, O(nmp) time, O(nm + mp + np) space.
+    pub fn mul_mat(&self, mat: &Matrix<K>) -> Matrix<K> {
         assert_eq!(self.cols, mat.rows, "incompatible matrix dimensions");
-        let mut out = Matrix::<f32>::zeros(self.rows, mat.cols);
+        let mut out = Matrix::zeros(self.rows, mat.cols);
         for col in 0..mat.cols {
             for row in 0..self.rows {
-                let mut acc = 0.0;
-                for pivot in 0..self.cols {
-                    acc = self.get(row, pivot).mul_add(mat.get(pivot, col), acc);
-                }
-                out.set(row, col, acc);
+                let value = (0..self.cols).fold(K::zero(), |acc, k| {
+                    self.get(row, k).mul_add(mat.get(k, col), acc)
+                });
+                out.set(row, col, value);
             }
         }
         out
     }
 
-    pub fn trace(&self) -> f32 {
+    // ex08
+    pub fn trace(&self) -> K {
         assert!(self.is_square(), "trace is defined on square matrices only");
-        let mut acc = 0.0;
-        for idx in 0..self.rows {
-            acc += self.get(idx, idx);
-        }
-        acc
+        (0..self.rows).fold(K::zero(), |acc, idx| acc + self.get(idx, idx))
     }
 
-    pub fn transpose(&self) -> Matrix<f32> {
-        let mut out = Matrix::<f32>::zeros(self.cols, self.rows);
+    // ex09
+    pub fn transpose(&self) -> Matrix<K> {
+        let mut out = Matrix::zeros(self.cols, self.rows);
         for row in 0..self.rows {
             for col in 0..self.cols {
                 out.set(col, row, self.get(row, col));
@@ -133,130 +224,63 @@ impl Matrix<f32> {
         out
     }
 
-    pub fn row_echelon(&self) -> Matrix<f32> {
-        let mut out = self.clone();
-        let mut lead_col = 0usize;
-        let mut pivot_row = 0usize;
-
-        while pivot_row < out.rows && lead_col < out.cols {
-            let mut best_row = pivot_row;
-            let mut best_value = abs_f32(out.get(best_row, lead_col));
-            for row in (pivot_row + 1)..out.rows {
-                let candidate = abs_f32(out.get(row, lead_col));
-                if candidate > best_value {
-                    best_value = candidate;
-                    best_row = row;
-                }
-            }
-            if is_near_zero(best_value) {
-                lead_col += 1;
-                continue;
-            }
-
-            out.swap_rows(pivot_row, best_row);
-            let pivot = out.get(pivot_row, lead_col);
-            for col in 0..out.cols {
-                out.set(pivot_row, col, out.get(pivot_row, col) / pivot);
-            }
-
-            for row in 0..out.rows {
-                if row == pivot_row {
-                    continue;
-                }
-                let factor = out.get(row, lead_col);
-                if is_near_zero(factor) {
-                    continue;
-                }
-                for col in 0..out.cols {
-                    let value = out.get(pivot_row, col).mul_add(-factor, out.get(row, col));
-                    out.set(row, col, value);
-                }
-            }
-
-            pivot_row += 1;
-            lead_col += 1;
-        }
-
-        for value in &mut out.data {
-            *value = normalize_near_zero(*value);
-        }
-        out
+    // ex10
+    /// Reduced row-echelon form, O(n³).
+    pub fn row_echelon(&self) -> Matrix<K> {
+        self.reduce().0
     }
 
-    pub fn determinant(&self) -> f32 {
+    // ex11
+    /// Determinant by Gaussian elimination with partial pivoting, O(n³).
+    /// Works for any size; the subject only requires n <= 4.
+    pub fn determinant(&self) -> K {
         assert!(
             self.is_square(),
             "determinant is defined on square matrices only"
         );
-        assert!(
-            self.rows <= 4,
-            "subject only requires determinant up to 4x4"
-        );
-
+        let size = self.rows;
+        let tolerance_sq = self.zero_tolerance_sq();
         let mut out = self.clone();
-        let mut sign = 1.0f32;
-        let mut det = 1.0f32;
+        let mut det = K::one();
 
-        for pivot_col in 0..out.cols {
-            let mut best_row = pivot_col;
-            let mut best_value = abs_f32(out.get(best_row, pivot_col));
-            for row in (pivot_col + 1)..out.rows {
-                let candidate = abs_f32(out.get(row, pivot_col));
-                if candidate > best_value {
-                    best_value = candidate;
-                    best_row = row;
-                }
-            }
-            if is_near_zero(best_value) {
-                return 0.0;
-            }
-
+        for pivot_col in 0..size {
+            let Some(best_row) = out.find_pivot(pivot_col, pivot_col, tolerance_sq) else {
+                return K::zero();
+            };
             if best_row != pivot_col {
                 out.swap_rows(best_row, pivot_col);
-                sign = -sign;
+                det = -det;
             }
 
             let pivot = out.get(pivot_col, pivot_col);
             det *= pivot;
 
-            for row in (pivot_col + 1)..out.rows {
+            for row in (pivot_col + 1)..size {
                 let factor = out.get(row, pivot_col) / pivot;
-                for col in pivot_col..out.cols {
-                    let new_value = out.get(pivot_col, col).mul_add(-factor, out.get(row, col));
-                    out.set(row, col, new_value);
-                }
+                out.eliminate(row, pivot_col, factor, pivot_col);
             }
         }
-
-        sign * det
+        det
     }
 
-    pub fn inverse(&self) -> Result<Matrix<f32>, MatrixError> {
+    // ex12
+    /// Inverse by Gauss-Jordan elimination on `[A | I]`, O(n³).
+    pub fn inverse(&self) -> Result<Matrix<K>, MatrixError> {
         assert!(
             self.is_square(),
             "inverse is defined on square matrices only"
         );
         let size = self.rows;
-
+        let tolerance_sq = self.zero_tolerance_sq();
         let mut left = self.clone();
-        let mut right = Matrix::<f32>::identity(size);
+        let mut right = Matrix::identity(size);
 
         for pivot_col in 0..size {
-            let mut best_row = pivot_col;
-            let mut best_value = abs_f32(left.get(best_row, pivot_col));
-            for row in (pivot_col + 1)..size {
-                let candidate = abs_f32(left.get(row, pivot_col));
-                if candidate > best_value {
-                    best_value = candidate;
-                    best_row = row;
-                }
-            }
-            if is_near_zero(best_value) {
-                return Err(MatrixError::SingularMatrix);
-            }
-
-            left.swap_rows(best_row, pivot_col);
-            right.swap_rows(best_row, pivot_col);
+            let best_row = left
+                .find_pivot(pivot_col, pivot_col, tolerance_sq)
+                .ok_or(MatrixError::SingularMatrix)?;
+            left.swap_rows(pivot_col, best_row);
+            right.swap_rows(pivot_col, best_row);
 
             let pivot = left.get(pivot_col, pivot_col);
             for col in 0..size {
@@ -265,492 +289,67 @@ impl Matrix<f32> {
             }
 
             for row in 0..size {
-                if row == pivot_col {
-                    continue;
-                }
                 let factor = left.get(row, pivot_col);
-                if is_near_zero(factor) {
-                    continue;
-                }
-                for col in 0..size {
-                    let left_value = left
-                        .get(pivot_col, col)
-                        .mul_add(-factor, left.get(row, col));
-                    let right_value = right
-                        .get(pivot_col, col)
-                        .mul_add(-factor, right.get(row, col));
-                    left.set(row, col, left_value);
-                    right.set(row, col, right_value);
+                if row != pivot_col && factor != K::zero() {
+                    left.eliminate(row, pivot_col, factor, pivot_col);
+                    right.eliminate(row, pivot_col, factor, 0);
                 }
             }
         }
 
-        for value in &mut right.data {
-            *value = normalize_near_zero(*value);
-        }
+        right.flush_noise();
         Ok(right)
     }
 
+    // ex13
+    /// Rank: the number of pivots found while reducing to row-echelon form, O(n³).
     pub fn rank(&self) -> usize {
-        let reduced = self.row_echelon();
-        let mut rank = 0usize;
-        for row in 0..reduced.rows {
-            let mut non_zero = false;
-            for col in 0..reduced.cols {
-                if !is_near_zero(reduced.get(row, col)) {
-                    non_zero = true;
-                    break;
-                }
-            }
-            if non_zero {
-                rank += 1;
-            }
-        }
-        rank
+        self.reduce().1
     }
 }
 
-impl<const M: usize, const N: usize> From<[[f32; M]; N]> for Matrix<f32> {
-    fn from(value: [[f32; M]; N]) -> Self {
-        let rows = M;
-        let cols = N;
-        let mut data = Vec::with_capacity(rows * cols);
-        for column in value {
-            data.extend_from_slice(&column);
-        }
-        Self { data, rows, cols }
-    }
-}
-
-impl Display for Matrix<f32> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        for col in 0..self.cols {
-            write!(f, "[")?;
-            for row in 0..self.rows {
-                write!(f, "{}", self.get(row, col))?;
-                if row + 1 != self.rows {
-                    write!(f, ", ")?;
-                }
-            }
-            write!(f, "]")?;
-            if col + 1 != self.cols {
-                writeln!(f)?;
-            }
-        }
-        Ok(())
-    }
-}
-
-impl Add for Matrix<f32> {
-    type Output = Self;
-
-    fn add(self, rhs: Self) -> Self::Output {
-        assert_eq!(self.shape(), rhs.shape(), "matrix dimensions must match");
+impl<K: Scalar> Lerp for Matrix<K> {
+    fn lerp_to(self, other: Self, t: f32) -> Self {
+        assert_eq!(self.shape(), other.shape(), "matrix dimensions must match");
         let Matrix { data, rows, cols } = self;
         let data = data
             .into_iter()
-            .zip(rhs.data)
-            .map(|(lhs, rhs)| lhs + rhs)
+            .zip(other.data)
+            .map(|(u, v)| u.lerp_to(v, t))
             .collect();
         Self { data, rows, cols }
     }
 }
 
-impl Sub for Matrix<f32> {
-    type Output = Self;
-
-    fn sub(self, rhs: Self) -> Self::Output {
-        assert_eq!(self.shape(), rhs.shape(), "matrix dimensions must match");
-        let Matrix { data, rows, cols } = self;
-        let data = data
-            .into_iter()
-            .zip(rhs.data)
-            .map(|(lhs, rhs)| lhs - rhs)
-            .collect();
-        Self { data, rows, cols }
-    }
-}
-
-impl Mul<f32> for Matrix<f32> {
-    type Output = Self;
-
-    fn mul(self, rhs: f32) -> Self::Output {
-        let Matrix { data, rows, cols } = self;
-        let data = data.into_iter().map(|value| value * rhs).collect();
-        Self { data, rows, cols }
-    }
-}
-
-impl Matrix<Complex> {
-    pub fn zeros(rows: usize, cols: usize) -> Self {
-        Self {
-            data: vec![Complex::zero(); rows * cols],
-            rows,
-            cols,
-        }
-    }
-
-    pub fn identity(size: usize) -> Self {
-        let mut out = Self::zeros(size, size);
-        for idx in 0..size {
-            out.set(idx, idx, Complex::one());
-        }
-        out
-    }
-
-    pub fn shape(&self) -> (usize, usize) {
-        (self.rows, self.cols)
-    }
-
-    pub fn is_square(&self) -> bool {
-        self.rows == self.cols
-    }
-
-    fn index_of(&self, row: usize, col: usize) -> usize {
-        col * self.rows + row
-    }
-
-    pub fn get(&self, row: usize, col: usize) -> Complex {
-        self.data[self.index_of(row, col)]
-    }
-
-    pub fn set(&mut self, row: usize, col: usize, value: Complex) {
-        let idx = self.index_of(row, col);
-        self.data[idx] = value;
-    }
-
-    fn swap_rows(&mut self, lhs: usize, rhs: usize) {
-        if lhs == rhs {
-            return;
-        }
-        for col in 0..self.cols {
-            let left_idx = self.index_of(lhs, col);
-            let right_idx = self.index_of(rhs, col);
-            self.data.swap(left_idx, right_idx);
-        }
-    }
-
-    pub fn add(&mut self, v: &Matrix<Complex>) {
-        assert_eq!(self.shape(), v.shape(), "matrix dimensions must match");
-        for (lhs, rhs) in self.data.iter_mut().zip(v.data.iter()) {
-            *lhs += *rhs;
-        }
-    }
-
-    pub fn sub(&mut self, v: &Matrix<Complex>) {
-        assert_eq!(self.shape(), v.shape(), "matrix dimensions must match");
-        for (lhs, rhs) in self.data.iter_mut().zip(v.data.iter()) {
-            *lhs -= *rhs;
-        }
-    }
-
-    pub fn scl(&mut self, a: Complex) {
-        for value in &mut self.data {
-            *value *= a;
-        }
-    }
-
-    pub fn mul_vec(&self, vec: &Vector<Complex>) -> Vector<Complex> {
-        assert_eq!(
-            self.cols,
-            vec.size(),
-            "incompatible matrix/vector dimensions"
-        );
-        let mut out = vec![Complex::zero(); self.rows];
-        for (row, slot) in out.iter_mut().enumerate() {
-            let mut acc = Complex::zero();
-            for col in 0..self.cols {
-                acc += self.get(row, col) * vec[col];
-            }
-            *slot = acc;
-        }
-        Vector::from(out)
-    }
-
-    pub fn mul_mat(&self, mat: &Matrix<Complex>) -> Matrix<Complex> {
-        assert_eq!(self.cols, mat.rows, "incompatible matrix dimensions");
-        let mut out = Matrix::<Complex>::zeros(self.rows, mat.cols);
-        for col in 0..mat.cols {
-            for row in 0..self.rows {
-                let mut acc = Complex::zero();
-                for pivot in 0..self.cols {
-                    acc += self.get(row, pivot) * mat.get(pivot, col);
-                }
-                out.set(row, col, acc);
+/// Each inner array is one row.
+impl<K: Scalar, const R: usize, const C: usize> From<[[K; C]; R]> for Matrix<K> {
+    fn from(value: [[K; C]; R]) -> Self {
+        let mut out = Self::zeros(R, C);
+        for (row, values) in value.iter().enumerate() {
+            for (col, &coefficient) in values.iter().enumerate() {
+                out.set(row, col, coefficient);
             }
         }
         out
     }
+}
 
-    pub fn trace(&self) -> Complex {
-        assert!(self.is_square(), "trace is defined on square matrices only");
-        let mut acc = Complex::zero();
-        for idx in 0..self.rows {
-            acc += self.get(idx, idx);
-        }
-        acc
-    }
-
-    pub fn transpose(&self) -> Matrix<Complex> {
-        let mut out = Matrix::<Complex>::zeros(self.cols, self.rows);
+/// One row per line.
+impl<K: Scalar> Display for Matrix<K> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         for row in 0..self.rows {
-            for col in 0..self.cols {
-                out.set(col, row, self.get(row, col));
-            }
-        }
-        out
-    }
-
-    pub fn row_echelon(&self) -> Matrix<Complex> {
-        let mut out = self.clone();
-        let mut lead_col = 0usize;
-        let mut pivot_row = 0usize;
-
-        while pivot_row < out.rows && lead_col < out.cols {
-            let mut best_row = pivot_row;
-            let mut best_value = out.get(best_row, lead_col).abs_sq();
-            for row in (pivot_row + 1)..out.rows {
-                let candidate = out.get(row, lead_col).abs_sq();
-                if candidate > best_value {
-                    best_value = candidate;
-                    best_row = row;
-                }
-            }
-            if is_near_zero(best_value) {
-                lead_col += 1;
-                continue;
-            }
-
-            out.swap_rows(pivot_row, best_row);
-            let pivot = out.get(pivot_row, lead_col);
-            for col in 0..out.cols {
-                out.set(pivot_row, col, out.get(pivot_row, col) / pivot);
-            }
-
-            for row in 0..out.rows {
-                if row == pivot_row {
-                    continue;
-                }
-                let factor = out.get(row, lead_col);
-                if factor.is_near_zero() {
-                    continue;
-                }
-                for col in 0..out.cols {
-                    let value = out.get(row, col) - factor * out.get(pivot_row, col);
-                    out.set(row, col, value);
-                }
-            }
-
-            pivot_row += 1;
-            lead_col += 1;
-        }
-
-        for value in &mut out.data {
-            *value = value.normalize_near_zero();
-        }
-        out
-    }
-
-    pub fn determinant(&self) -> Complex {
-        assert!(
-            self.is_square(),
-            "determinant is defined on square matrices only"
-        );
-        assert!(
-            self.rows <= 4,
-            "subject only requires determinant up to 4x4"
-        );
-
-        let mut out = self.clone();
-        let mut sign = Complex::one();
-        let mut det = Complex::one();
-
-        for pivot_col in 0..out.cols {
-            let mut best_row = pivot_col;
-            let mut best_value = out.get(best_row, pivot_col).abs_sq();
-            for row in (pivot_col + 1)..out.rows {
-                let candidate = out.get(row, pivot_col).abs_sq();
-                if candidate > best_value {
-                    best_value = candidate;
-                    best_row = row;
-                }
-            }
-            if is_near_zero(best_value) {
-                return Complex::zero();
-            }
-
-            if best_row != pivot_col {
-                out.swap_rows(best_row, pivot_col);
-                sign = sign * Complex::from(-1.0);
-            }
-
-            let pivot = out.get(pivot_col, pivot_col);
-            det *= pivot;
-
-            for row in (pivot_col + 1)..out.rows {
-                let factor = out.get(row, pivot_col) / pivot;
-                for col in pivot_col..out.cols {
-                    let new_value = out.get(row, col) - factor * out.get(pivot_col, col);
-                    out.set(row, col, new_value);
-                }
-            }
-        }
-
-        sign * det
-    }
-
-    pub fn inverse(&self) -> Result<Matrix<Complex>, MatrixError> {
-        assert!(
-            self.is_square(),
-            "inverse is defined on square matrices only"
-        );
-        let size = self.rows;
-
-        let mut left = self.clone();
-        let mut right = Matrix::<Complex>::identity(size);
-
-        for pivot_col in 0..size {
-            let mut best_row = pivot_col;
-            let mut best_value = left.get(best_row, pivot_col).abs_sq();
-            for row in (pivot_col + 1)..size {
-                let candidate = left.get(row, pivot_col).abs_sq();
-                if candidate > best_value {
-                    best_value = candidate;
-                    best_row = row;
-                }
-            }
-            if is_near_zero(best_value) {
-                return Err(MatrixError::SingularMatrix);
-            }
-
-            left.swap_rows(best_row, pivot_col);
-            right.swap_rows(best_row, pivot_col);
-
-            let pivot = left.get(pivot_col, pivot_col);
-            for col in 0..size {
-                left.set(pivot_col, col, left.get(pivot_col, col) / pivot);
-                right.set(pivot_col, col, right.get(pivot_col, col) / pivot);
-            }
-
-            for row in 0..size {
-                if row == pivot_col {
-                    continue;
-                }
-                let factor = left.get(row, pivot_col);
-                if factor.is_near_zero() {
-                    continue;
-                }
-                for col in 0..size {
-                    let left_value = left.get(row, col) - factor * left.get(pivot_col, col);
-                    let right_value = right.get(row, col) - factor * right.get(pivot_col, col);
-                    left.set(row, col, left_value);
-                    right.set(row, col, right_value);
-                }
-            }
-        }
-
-        for value in &mut right.data {
-            *value = value.normalize_near_zero();
-        }
-        Ok(right)
-    }
-
-    pub fn rank(&self) -> usize {
-        let reduced = self.row_echelon();
-        let mut rank = 0usize;
-        for row in 0..reduced.rows {
-            let mut non_zero = false;
-            for col in 0..reduced.cols {
-                if !reduced.get(row, col).is_near_zero() {
-                    non_zero = true;
-                    break;
-                }
-            }
-            if non_zero {
-                rank += 1;
-            }
-        }
-        rank
-    }
-}
-
-impl<const M: usize, const N: usize> From<[[Complex; M]; N]> for Matrix<Complex> {
-    fn from(value: [[Complex; M]; N]) -> Self {
-        let rows = M;
-        let cols = N;
-        let mut data = Vec::with_capacity(rows * cols);
-        for column in value {
-            data.extend_from_slice(&column);
-        }
-        Self { data, rows, cols }
-    }
-}
-
-impl Display for Matrix<Complex> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        for col in 0..self.cols {
-            write!(f, "[")?;
-            for row in 0..self.rows {
-                write!(f, "{}", self.get(row, col))?;
-                if row + 1 != self.rows {
-                    write!(f, ", ")?;
-                }
-            }
-            write!(f, "]")?;
-            if col + 1 != self.cols {
+            if row != 0 {
                 writeln!(f)?;
             }
+            write!(f, "[")?;
+            for col in 0..self.cols {
+                if col != 0 {
+                    write!(f, ", ")?;
+                }
+                self.get(row, col).fmt_scalar(f)?;
+            }
+            write!(f, "]")?;
         }
         Ok(())
-    }
-}
-
-impl Add for Matrix<Complex> {
-    type Output = Self;
-
-    fn add(self, rhs: Self) -> Self::Output {
-        assert_eq!(self.shape(), rhs.shape(), "matrix dimensions must match");
-        let Matrix { data, rows, cols } = self;
-        let data = data
-            .into_iter()
-            .zip(rhs.data)
-            .map(|(lhs, rhs)| lhs + rhs)
-            .collect();
-        Self { data, rows, cols }
-    }
-}
-
-impl Sub for Matrix<Complex> {
-    type Output = Self;
-
-    fn sub(self, rhs: Self) -> Self::Output {
-        assert_eq!(self.shape(), rhs.shape(), "matrix dimensions must match");
-        let Matrix { data, rows, cols } = self;
-        let data = data
-            .into_iter()
-            .zip(rhs.data)
-            .map(|(lhs, rhs)| lhs - rhs)
-            .collect();
-        Self { data, rows, cols }
-    }
-}
-
-impl Mul<Complex> for Matrix<Complex> {
-    type Output = Self;
-
-    fn mul(self, rhs: Complex) -> Self::Output {
-        let Matrix { data, rows, cols } = self;
-        let data = data.into_iter().map(|value| value * rhs).collect();
-        Self { data, rows, cols }
-    }
-}
-
-impl Mul<f32> for Matrix<Complex> {
-    type Output = Self;
-
-    fn mul(self, rhs: f32) -> Self::Output {
-        let Matrix { data, rows, cols } = self;
-        let data = data.into_iter().map(|value| value * rhs).collect();
-        Self { data, rows, cols }
     }
 }
